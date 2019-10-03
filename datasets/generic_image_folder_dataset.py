@@ -13,12 +13,12 @@ import torchvision
 from torchvision.datasets.folder import pil_loader, ImageFolder
 
 
-def ImageFolderDataset(split_folder, inmem, workers, **kwargs):
+def ImageFolderDataset(path, inmem, workers, **kwargs):
     """Return the choosen dataset depending on the inmeme parameter
 
     Parameters
     ----------
-    split_folder : string
+    path : string
         Path to the dataset on the file System
     inmem : boolean
         Load the whole dataset in memory. If False, only file names are stored and images are loaded
@@ -31,7 +31,7 @@ def ImageFolderDataset(split_folder, inmem, workers, **kwargs):
     torch.utils.data.Dataset
         Split at the chosen path
     """
-    return ImageFolderInMemory(split_folder, workers) if inmem else ImageFolderTorchVision(split_folder)
+    return ImageFolderInMemory(path, workers) if inmem else ImageFolderTorchVision(path)
 
 
 class ImageFolderTorchVision(ImageFolder):
