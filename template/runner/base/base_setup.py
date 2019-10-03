@@ -359,17 +359,17 @@ class BaseSetup:
         train_dir = os.path.join(input_folder, 'train')
         if not os.path.isdir(train_dir):
             raise RuntimeError("Train folder not found in the dataset_folder=" + input_folder)
-        train_ds = cls.get_split(split_folder=train_dir, **kwargs)
+        train_ds = cls.get_split(path=train_dir, **kwargs)
 
         val_dir = os.path.join(input_folder, 'val')
         if not os.path.isdir(val_dir):
             raise RuntimeError("Val folder not found in the dataset_folder=" + input_folder)
-        val_ds = cls.get_split(split_folder=val_dir, **kwargs)
+        val_ds = cls.get_split(path=val_dir, **kwargs)
 
         test_dir = os.path.join(input_folder, 'test')
         if not os.path.isdir(test_dir):
             raise RuntimeError("Test folder not found in the dataset_folder=" + input_folder)
-        test_ds = cls.get_split(split_folder=test_dir, **kwargs)
+        test_ds = cls.get_split(path=test_dir, **kwargs)
 
         return train_ds, val_ds, test_ds
 
