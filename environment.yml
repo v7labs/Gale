@@ -189,8 +189,6 @@ dependencies:
     - prometheus-client==0.7.1
     - py==1.8.0
     - pycuda==2019.1
-    - pyrlang==0.9
-    - pyrlang-term==1.2
     - pyrsistent==0.15.2
     - pytest==5.0.0
     - python-polylabel==0.6
