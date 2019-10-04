@@ -14,7 +14,7 @@ RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
 ENV PATH /opt/conda/bin:$PATH
 ENV PYTHONPATH /gale:$PYTHONPATH
 
-#Create gale conda environment
+#Create gale conda environment (like cd gale)
 WORKDIR /gale
 ADD environment.yml .
 RUN conda env create -f environment.yml
@@ -24,5 +24,8 @@ ENV PATH /home/user/.conda/envs/gale/bin/:$PATH
 
 # Copy Gale over
 ADD . .
+
+# Add gust and the entry point over
+#TODO pip install gust
 
 ENTRYPOINT ["python", "-u", "template/RunMe.py"]
