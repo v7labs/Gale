@@ -15,9 +15,6 @@ class Singleton(type):
 
 class TBWriter(metaclass=Singleton):
 
-    def __init__(self, log_dir):
-        self.init(log_dir)
-
     def init(self, log_dir):
         """Init the output folder and the SummaryWriter object"""
         self.writer = SummaryWriter(log_dir=log_dir)

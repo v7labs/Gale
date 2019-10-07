@@ -542,7 +542,7 @@ class RunMe:
 
         # Define Tensorboard SummaryWriter
         logging.info('Initialize Tensorboard SummaryWriter')
-        TBWriter(log_dir=log_folder)
+        TBWriter().init(log_dir=log_folder)
 
         # Add all parameters to Tensorboard
         TBWriter().add_text(tag='Args', text_string=json.dumps(args_dict))
