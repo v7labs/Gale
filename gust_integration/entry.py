@@ -1,121 +1,142 @@
-from gust import Gust
-from template.RunMe import RunMe
+import base64
 from pathlib import Path
-import os
+
+import requests
+from gust import Gust
+
+from template.RunMe import RunMe
 
 gust = Gust()
 gust.start()
 
 @gust.load
-def load_function(data):
-    """ TODO
+def load_function(weights_url: str, params: dict):
+    """Download the model and delegate to Gale the duty of loading it in memory
 
     Parameters
     ----------
-    data
+    weights_url : str
+        URL of the model weights to download and save on the file system
+    params : Dict
+        Dictionary containing all the parameters for Gale, in the Gale format e.g. "-rc" : "ImageClassification"
+
+        NECESSARY ENTRIES
+            "-rc" : runner class to use
 
     Returns
     -------
-
+    Dict
+        Gale response
     """
-    data
-    a = f"--model-name {data['model']}"
-    return RunMe().start(["--pre-load", _prepare_CLArguments(title='infer', data=data)])
+    # Download the model weights and provide a path to it
+    params["--load-model"] = download_model(weights_url)
+    return RunMe().start(["--pre-load", *_prepare_CLArguments(title='infer', params=params)])
 
 @gust.inference
-def infer_function(data):
-    """ TODO
+def infer_function(image:dict, params:dict):
+    """Run inference with the model and image provided
 
     Parameters
     ----------
-    data
+    image : Dict
+        Dictionary containing the base64 image to do inference on
+    params : Dict
+        Dictionary containing all the parameters for Gale, in the Gale format e.g. "-rc" : "ImageClassification"
+
+        NECESSARY ENTRIES
+            "-rc" : runner class to use
 
     Returns
     -------
-
+    Dict
+        Gale response
     """
-    # Override the input_folder to point to image_path if set (happens at inference time)
-    """image_path : str
-        Path where the image have been downloaded with filename too. Used only in inference; None when training"""
-    if image_path is not None:
-        data['--input-folder'] = image_path
-
+    # Image comes as a base64 string
+    with open("/tmp/inference.png", "wb") as fh:
+        fh.write(base64.decodebytes(image['base64']))
+    params['--input-folder'] = "/tmp/inference.png"
     # Execute Gale
-    return RunMe().start(_prepare_CLArguments(title='infer', data=data))
+    return RunMe().start(_prepare_CLArguments(title='infer', params=params))
 
 @gust.train
-def train_function(data):
-    """ TODO
+def train_function(dataset_id:str, params: dict):
+    """Train a model with the parameters provided in data.
 
     Parameters
     ----------
-    data
+    dataset_id: str
+        ID of the dataset on Darwin
+    params : Dict
+        Dictionary containing all the parameters for Gale, in the Gale format e.g. "-rc" : "ImageClassification"
 
+        NECESSARY ENTRIES
+            "-rc" : runner class to use
     Returns
     -------
-
+    Dict
+        Gale response
     """
-    # TODO Use Jon's branch to create a Pytorch Dataset
-    return RunMe().start(_prepare_CLArguments(title='train', data=data))
+    # TODO Use Darwin-py to create a Pytorch Dataset
+    print(f"I wish I could download {dataset_id} but my developers did not yet enabled me to.")
+    return RunMe().start(_prepare_CLArguments(title='train', params=params))
 
 ###################################################################################################
-def download_file(url):
-    """ TODO
+def download_model(url: str):
+    """Downloads a file given an url and returns its path on the current file system
 
     Parameters
     ----------
-    url
+    url : str
+        URL from which the file needs to be downloaded
 
     Returns
     -------
-
+    path : str
+        Path to the downloaded file
     """
-    path = Path("/tmp") / urlparse(url).path
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
-        with open(path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
+    path = Path("/tmp/model.pth")
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
     return path
 
-def _prepare_CLArguments(title, data):
+def _prepare_CLArguments(title:str , params:dict):
     """Prepares all the CLArguments to be passed to Gale
 
     Parameters
     ----------
     title : str
         Either 'infer' or 'train'. Specifies which subroutine should be called.
-    data : dict
+    params : dict
         Dictionary containing all extra parameters received with the request
+
     Returns
     -------
-    config_args : List(str)
+    List(str)
         List of strings containing all the arguments to be passed to GALE
     """
     # As per Njord implementation 'data' can't be None, but better safe than sorry!
-    if data is None:
-        data = {}
+    assert params is not None
     # Inject default parameters to make the HTTP requests less verbose.
-    data = _default_parameters(title)
-    # If there is a config file, read its arguments and merge them with data arguments
-    config_args = _read_config_args(title)
-    config_args = _merge_default_and_data(config_args, data)
-    # Make sure all elements are strings (e.g could be int coming from data)
-    config_args = [str(i) for i in config_args]
-    return config_args
+    default = _default_parameters(title)
+    # Merge default with data arguments. Note: A default parameter WILL NOT OVERRIDE a parameter already present in 'data'
+    params = {**default, **params}
+    # Make sure all elements are strings (e.g could be int coming from data) and make a list out of the dict
+    return [str(x) for k, v in params.items() for x in [k, v]]
 
-def _default_parameters(title: str) -> dict:
-    """Inject default parameters into data depending from the train/inference type.
-    Note: A default parameter WILL NOT OVERRIDE a parameter already present in 'data'
+def _default_parameters(title:str) -> dict:
+    """Prepare default parameters depending from the train/inference type.
 
     Parameters
     ----------
     title : str
         Either 'infer' or 'train'. Specifies which subroutine should be called.
-    data : dict
-        Dictionary containing all extra parameters received with the request
+
     Returns
     -------
     dict
@@ -123,46 +144,15 @@ def _default_parameters(title: str) -> dict:
     """
     if title == "infer":
         return {"--inference": "",
-                "--ignoregit": "",
-                "--load-model": os.path.join(self.path, self.experiment_id, 'best.pth'),
                 "--input-folder": "NOT USED IN PRE-LOAD, OVERRIDE ME AT ACTUAL INFERENCE TIME",
+                "--ignoregit": "",
                 "--output-folder":  '/gale/output',
-                "--experiment-name": f"inference_{self.experiment_id}",}
+                "--experiment-name": "inference_gale",}
 
     if title == "train":
-        return {"--ignoregit": "",
-                "--disable-dataset-integrity": "",
+        return {"--disable-dataset-integrity": "",
+                "--ignoregit": "",
                 "--output-folder": '/gale/output',
-                "--experiment-name": f"train_{self.experiment_id}",}
+                "--experiment-name": "train_gale",}
 
     raise ValueError(f"Invalid value of title ({title}).")
-
-def _merge_default_and_data(default, data):
-    """If data has been provided, add (and OVERRIDE!) the parameters from the default list
-
-    Parameters
-    ----------
-    default : List(str)
-        List of arguments parsed from the relevant part of the config file. Might be empty
-    data : dict
-        Dictionary containing all extra parameters received with the request and default ones
-    Returns
-    -------
-    config_args : List(str)
-        List of arguments after merging data and the original config_args.
-    """
-    for k, v in data.items():
-        try:
-            index = default.index(k)
-            # The arg is already in the list. If applicable, we update its value
-            if v != "":
-                # If value is not empty the next element in the list must be a value and not a name
-                assert not default[index + 1].startswith('-')
-                # Update the value
-                default[index + 1] = v
-        except ValueError:
-            # The arg is not in the list, so we append it
-            default.append(k)
-            if v != "":
-                default.append(v)
-    return default

@@ -20,7 +20,7 @@ ADD environment.yml .
 RUN conda env create -f environment.yml
 
 # Add the path of the python interpreter (like source activate gale)
-ENV PATH /home/user/.conda/envs/gale/bin/:$PATH
+ENV PATH /opt/conda/envs/gale/bin/:$PATH
 
 # Copy Gale over
 ADD . .
