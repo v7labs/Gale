@@ -467,7 +467,7 @@ class RunMe:
         LOG_FILE = 'logs.txt'
 
         # Recover dataset name
-        dataset = os.path.basename(os.path.normpath(kwargs['input_folder']))
+        dataset = os.path.basename(os.path.normpath(kwargs['input_folder'])) if kwargs['input_folder'] is not None else ""
 
         """
         We extract the TRAIN parameters names (such as model_name, lr, ... ) from the parser directly.
@@ -489,7 +489,7 @@ class RunMe:
             if group.title not in ['GENERAL', 'DATA']:
                 for action in group._group_actions:
                     if (kwargs[action.dest] is not None) and (
-                            kwargs[action.dest] != action.default) and action.dest != 'load_model':
+                            kwargs[action.dest] != action.default) and action.dest != 'load_model' and action.dest != 'input_image' :
                         non_default_parameters.append(str(action.dest) + "=" + str(kwargs[action.dest]))
 
         # Build up final logging folder tree with the non-default training parameters
