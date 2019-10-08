@@ -24,8 +24,3 @@ ENV PATH /opt/conda/envs/gale/bin/:$PATH
 
 # Copy Gale over
 ADD . .
-
-# Add gust and the entry point over
-#TODO pip install gust
-
-ENTRYPOINT ["python", "-u", "template/RunMe.py"]
