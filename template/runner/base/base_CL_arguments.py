@@ -60,6 +60,9 @@ class BaseCLArguments:
         parser_general.add_argument('--input-folder',
                                     help='location of the dataset on the machine e.g root/data',
                                     required=False)
+        parser_general.add_argument('--input-image',
+                                    help='an image to process, encoded in base64',
+                                    required=False)
         parser_general.add_argument('--output-folder',
                                     default='./output/',
                                     help='where to save all output files.', )

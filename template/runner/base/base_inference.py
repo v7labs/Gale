@@ -7,15 +7,18 @@ instead of hard-coding stuff.
 # Utils
 import logging
 import os
-import numpy as np
+import base64
+import io
 
 # Delegated
 import torch
+from PIL import Image
 
 from template.runner.base import AbstractRunner
 from template.runner.base.base_routine import BaseRoutine
 from template.runner.base.base_setup import BaseSetup
 from util.misc import pil_loader
+
 
 class BaseInference(AbstractRunner):
 
@@ -76,7 +79,7 @@ class BaseInference(AbstractRunner):
         """
         return torch.load(load_model)
 
-    def preprocess(self, input_folder, **kwargs):
+    def preprocess(self, input_folder, input_image, **kwargs):
         """Load and prepares the data to be fed to the neural network
 
         Parameters
@@ -89,8 +92,16 @@ class BaseInference(AbstractRunner):
         img : torch.Tensor | torch.cuda.Tensor
             The loaded and preprocessed image and moved to the correct device
         """
-        # Load the image
-        img = self._load_image(input_folder)
+        # Load the image from file system from the path specifiec
+        if input_folder is not None:
+            assert input_image is None
+            img = self._load_image(input_folder)
+
+        # Load the image from base64 passed as parameter
+        if input_image is not None:
+            assert input_folder is None
+            img = Image.open(io.BytesIO(base64.decodebytes(input_image.encode("utf-8"))))
+
         # Transform it
         img = self.transform(img)
         # Move it to the correct device
