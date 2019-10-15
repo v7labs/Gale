@@ -240,18 +240,6 @@ class BaseCLArguments:
                                       type=float,
                                       default=0.001,
                                       help='learning rate to be used for training')
-        parser_optimizer.add_argument('--step-size',
-                                      default=10,
-                                      type=int,
-                                      help='decrease lr every step-size epochs')
-        parser_optimizer.add_argument('--milestones',
-                                      type=int, nargs='+',
-                                      default=[8, 11],
-                                      help='decrease lr every at each given milestone epoch')
-        parser_optimizer.add_argument('--gamma',
-                                      default=0.1,
-                                      type=float,
-                                      help='decrease lr by a factor of lr-gamma')
         parser_optimizer.add_argument('--epoch-lrscheduler-name',
                                       choices=lrscheduler_options,
                                       default=[],
@@ -264,12 +252,19 @@ class BaseCLArguments:
                                       help='learning rate schedulers to be called after every batch')
         parser_optimizer.add_argument('--base-lr',
                                       type=float,
-                                      default=0.0001,
                                       help='parameter for torch.optim.lr_scheduler.CyclicLR scheduler')
         parser_optimizer.add_argument('--max-lr',
                                       type=float,
-                                      default=0.01,
                                       help='parameter for torch.optim.lr_scheduler.CyclicLR scheduler')
+        parser_optimizer.add_argument('--step-size',
+                                      type=int,
+                                      help='decrease lr every step-size epochs')
+        parser_optimizer.add_argument('--milestones',
+                                      type=int, nargs='+',
+                                      help='decrease lr every at each given milestone epoch')
+        parser_optimizer.add_argument('--gamma',
+                                      type=float,
+                                      help='decrease lr by a factor of lr-gamma')
 
     def _criterion_options(self, parser):
         """ Options specific for optimizers """
