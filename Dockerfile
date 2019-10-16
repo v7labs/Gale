@@ -17,7 +17,7 @@ ENV PYTHONPATH /gale:$PYTHONPATH
 #Create gale conda environment (like cd gale)
 WORKDIR /gale
 ADD environment.yml .
-RUN conda env create -f environment.yml
+RUN conda env create -f environment.yml && conda clean -a -y
 
 # Add the path of the python interpreter (like source activate gale)
 ENV PATH /opt/conda/envs/gale/bin/:$PATH

@@ -10,7 +10,6 @@ import torch
 import torchvision
 import zipfile
 from PIL import Image
-from scipy.io import loadmat as _loadmat
 from pathlib import Path
 from datasets.util.dataset_splitter import split_dataset
 from util.misc import make_folder_if_not_exists
@@ -84,6 +83,8 @@ def svhn(args):
     -------
         None
     """
+    from scipy.io import loadmat as _loadmat
+
     # Use torchvision to download the dataset
     torchvision.datasets.SVHN(root=args.output_folder, split='train', download=True)
     torchvision.datasets.SVHN(root=args.output_folder, split='test', download=True)

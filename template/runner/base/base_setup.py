@@ -1,28 +1,25 @@
 # Utils
-import glob
 import inspect
 import logging
 import os
+# Torch related stuff
+import shutil
 import sys
 from abc import abstractmethod
-from random import shuffle, sample
 
 import numpy as np
 import pandas as pd
-
-# Torch related stuff
-import shutil
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim
 import torch.utils.data
 
-# DeepDIVA
-import yaml
-
 import models
 from datasets.util.dataset_integrity import verify_dataset_integrity
+
+
+# DeepDIVA
 
 
 class BaseSetup:
@@ -350,8 +347,10 @@ class BaseSetup:
             Train, validation and test splits
         """
         if darwin_dataset:
+            pass
             # Split the data into train/val/test folders
-            cls.split_darwin_dataset(input_folder=input_folder, **kwargs)
+            # TODO use darwin-py
+            # cls.split_darwin_dataset(input_folder=input_folder, **kwargs)
 
         if not os.path.isdir(input_folder):
             raise RuntimeError("Dataset folder not found at " + input_folder)
@@ -372,71 +371,6 @@ class BaseSetup:
         test_ds = cls.get_split(path=test_dir, **kwargs)
 
         return train_ds, val_ds, test_ds
-
-    @classmethod
-    def split_darwin_dataset(cls, input_folder, darwin_splits, current_log_folder, **kwargs):
-        """Splits a GUST-Elixir datasets downloaded into train/val/test with symlinks
-
-        RANDOM SPLITTING
-
-        Parameters
-        ----------
-        input_folder : str
-            Path to the dataset on the file System
-        darwin_splits : list(float)
-            Specifies the % of the train/val/test splits
-        current_log_folder : string
-            Path to where logs/checkpoints are saved
-        """
-        # Load annotations and images file names
-        annotations_path = os.path.join(input_folder, 'annotations')
-        assert os.path.exists(annotations_path)
-        annotations_file_names = np.asarray(glob.glob(annotations_path + '/*.json'))
-        images_path = os.path.join(input_folder, 'images')
-        assert os.path.exists(images_path)
-        images_file_names = np.asarray([f for ext in ['jpg', 'jpeg', 'png'] for f in glob.glob(images_path + '/*.' + ext)])
-        assert len(annotations_file_names) == len(images_file_names)
-
-        # Create a set of indexes and split it into sub-sets
-        indexes = set(range(0, len(images_file_names)))
-        assert np.sum(darwin_splits) == 100
-        splits = {k: int(np.round(len(indexes) * v / 100.0)) for k, v in zip(['train', 'val', 'test'], darwin_splits)}
-        for n, size in splits.items():
-            s = sample(indexes, size)
-            splits[n] = np.asarray(s)
-            indexes.difference_update(set(s))
-        assert len(indexes) == 0
-        assert np.sum([len(v) for v in splits.values()]) == len(images_file_names)
-
-        # Slice the filenames according to the indexes
-        annotations = {}
-        images = {}
-        for s, idx in splits.items():
-            annotations[s] = annotations_file_names[idx]
-            images[s] = images_file_names[idx]
-
-        # Split annotations with symlinks
-        def _split_with_symlinks(d, sub_folder):
-            for split_name, file_names in d.items():
-                # Create the folder
-                path = os.path.join(input_folder, split_name, sub_folder)
-                if not os.path.exists(path):
-                    os.makedirs(path)
-                # Make symlinks for all files
-                for f in file_names:
-                    dst = os.path.join(path, os.path.basename(f))
-                    if os.path.exists(dst):
-                        os.remove(dst)
-                    os.symlink(f, dst)
-        _split_with_symlinks(annotations, 'annotations')
-        _split_with_symlinks(images, 'images')
-
-        # Log the splits
-        with open(os.path.join(current_log_folder, "splits.yaml"), "w") as stream:
-            log = {}
-            for s, i in images.items():
-                log[s] = [os.path.basename(f) for f in i]
-            yaml.dump(log, stream)
 
     @classmethod
     def get_split(cls, split_folder, **kwargs):
