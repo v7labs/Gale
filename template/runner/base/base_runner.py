@@ -34,32 +34,34 @@ class BaseRunner(AbstractRunner):
 
         Returns
         -------
-        train_value : ndarray[floats] of size (1, `epochs`)
-            Accuracy values for train split
-        val_value : ndarray[floats] of size (1, `epochs`+1)
-            Accuracy values for validation split. NOTE that the last element is actually the first validation at epoch=-1
-        test_value : float
-            Accuracy value for test split
+        _ : dict
+        A dictionary which contains the payload produced by the execution.
+
+        Notes
+        -----
+        Entries of the return dictionary are:
+            train_value : ndarray[floats] of size (1, `epochs`)
+                Accuracy values for train split
+            val_value : ndarray[floats] of size (1, `epochs`+1)
+                Accuracy values for validation split.
+                NOTE that the last element is actually the first validation at epoch=-1
+            test_value : float
+                Accuracy value for test split
         """
+        payload = {}
 
         # Prepare
-        dict = self.prepare(**kwargs)
+        d = self.prepare(**kwargs)
 
         if not kwargs["test_only"]:
             # Train routine
-            train_value, val_value = self.train_routine(**dict, **kwargs)
+            payload['train'], payload['val'] = self.train_routine(**d, **kwargs)
 
         # Test routine
-        if dict["test_loader"] is not None:
-            test_value = self.test_routine(**dict, **kwargs)
-        else:
-            test_value = None
+        if "test_loader" in d and d["test_loader"] is not None:
+            payload['test'] = self.test_routine(**d, **kwargs)
 
-        return {
-            'train': train_value,
-            'val': val_value,
-            'test': test_value,
-        }
+        return payload
 
     ####################################################################################################################
 
@@ -80,24 +82,31 @@ class BaseRunner(AbstractRunner):
 
         Returns
         -------
-        model : DataParallel
-            The model to train
-        num_classes : int
-            The number of classes as returned by the set_up_dataloaders()
-        best_value : float
-            Best value of the model so far. Non-zero only in case of --resume being used
-        train_loader : torch.utils.data.dataloader.DataLoader
-        val_loader : torch.utils.data.dataloader.DataLoader
-        test_loader : torch.utils.data.dataloader.DataLoader
-            Train/Val/Test set dataloader
-        optimizer : torch.optim
-            Optimizer to use during training, e.g. SGD
-        criterion : torch.nn.modules.loss
-            Loss function to use, e.g. cross-entropy
-        batch_lr_schedulers : list(torch.optim.lr_scheduler)
-            List of lr schedulers to be called after each batch. By default there is a warmup lr scheduler
-        epoch_lr_schedulers : list(torch.optim.lr_scheduler)
-            List of lr schedulers to be called after each epoch. Can be empty
+        _ : dict
+        Dictionary containing all the prepared elements. See examples.
+
+        Notes
+        -----
+        Entries of the return dictionary are:
+            model : DataParallel
+                The model to train
+            num_classes : int
+                The number of classes as returned by the set_up_dataloaders()
+            best_value : float
+                Best value of the model so far. Non-zero only in case of --resume being used
+            train_loader : torch.utils.data.dataloader.DataLoader
+            val_loader : torch.utils.data.dataloader.DataLoader
+            test_loader : torch.utils.data.dataloader.DataLoader
+                Train/Val/Test set dataloader
+            optimizer : torch.optim
+                Optimizer to use during training, e.g. SGD
+            criterion : torch.nn.modules.loss
+                Loss function to use, e.g. cross-entropy
+            batch_lr_schedulers : list(torch.optim.lr_scheduler)
+                List of lr schedulers to be called after each batch.
+                By default there is a warmup lr scheduler
+            epoch_lr_schedulers : list(torch.optim.lr_scheduler)
+                List of lr schedulers to be called after each epoch. Can be empty
         """
         # Get the selected model input size
         model_expected_input_size = models.__dict__[model_name].expected_input_size

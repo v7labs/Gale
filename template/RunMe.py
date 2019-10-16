@@ -71,12 +71,8 @@ class RunMe:
 
         Returns
         -------
-        train_scores : ndarray[floats] of size (1, `epochs`) or None
-            Score values for train split
-        val_scores : ndarray[floats] of size (1, `epochs`+1) or None
-            Score values for validation split
-        test_scores : float or None
-            Score value for test split
+        _ : dict
+        A dictionary which contains the payload of the runner class
         """
         # Parse all command line arguments
         args, cls.parser = cls._parse_arguments(args)
