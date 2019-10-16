@@ -1,4 +1,4 @@
-FROM nvidia/cuda:10.1-devel
+FROM nvidia/cuda:10.1-runtime
 RUN groupadd -g 1001 user && \
     useradd -u 1001 -g 1001 -ms /bin/bash user && \
     mkdir /gale && \
