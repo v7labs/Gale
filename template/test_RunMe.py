@@ -12,10 +12,9 @@ the main functions can be tested.
 Please keep the list of these tests up to date as soon as you add new features.
 """
 import shutil
-
-import numpy as np
-import pytest
 from pathlib import Path
+
+import pytest
 
 from datasets.util.get_a_dataset import cifar10
 from template.RunMe import RunMe
