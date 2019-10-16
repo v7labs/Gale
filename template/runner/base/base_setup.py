@@ -66,7 +66,7 @@ class BaseSetup:
                 logging.error("No model dict found at '{}'".format(load_model))
                 raise SystemExit
             logging.info('Loading a saved model')
-            checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage.cuda())
+            checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage)
             if 'model_name' in checkpoint:
                 model_name = checkpoint['model_name']
             # Override the number of classes based on the size of the last layer in the dictionary
