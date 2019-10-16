@@ -77,7 +77,7 @@ class BaseInference(AbstractRunner):
         -------
             A dictionary containing the loaded checkpoint
         """
-        return torch.load(load_model)
+        return torch.load(load_model, map_location=lambda storage, loc: storage)
 
     def preprocess(self, input_folder, input_image, **kwargs):
         """Load and prepares the data to be fed to the neural network
