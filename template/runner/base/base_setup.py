@@ -6,6 +6,7 @@ import os
 import shutil
 import sys
 from abc import abstractmethod
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -33,7 +34,7 @@ class BaseSetup:
     design pattern will be broken!
     """
 
-    ####################################################################################################################
+    ################################################################################################
     # General setup: model, optimizer, lr scheduler and criterion
     @classmethod
     def setup_model(cls, model_name, no_cuda, num_classes=None, load_model=None, strict=True, **kwargs):
@@ -196,43 +197,12 @@ class BaseSetup:
             criterion.cuda()
         return criterion
 
-    ####################################################################################################################
+    ################################################################################################
     # Analytics handling
     @classmethod
-    def _load_analytics_csv(cls, input_folder, **kwargs):
-        """ Load the analytics.csv file. If it is missing, attempt creating it
-
-        Parameters
-        ----------
-        input_folder : string
-            Path string that points to the three folder train/val/test. Example: ~/../../data/svhn
-
-        Returns
-        -------
-        file
-            The csv file
+    def create_analytics_csv(cls, input_folder, darwin_dataset, train_ds, **kwargs):
         """
-        # If analytics.csv file not present, run the analytics on the dataset
-        if not os.path.exists(os.path.join(input_folder, "analytics.csv")):
-            logging.warning('Missing analytics.csv file for dataset located at {}'.format(input_folder))
-            try:
-                logging.warning('Attempt creating analytics.csv file for dataset located at {}'.format(input_folder))
-                cls.create_analytics_csv(input_folder=input_folder, **kwargs)
-                logging.warning('Created analytics.csv file for dataset located at {} '.format(input_folder))
-            except NotImplementedError:
-                logging.error('The method create_analytics_csv() is not implemented.')
-                sys.exit(-1)
-            except:
-                logging.error('Creation of analytics.csv failed.')
-                raise SystemError
-        # Loads the analytics csv
-        return pd.read_csv(os.path.join(input_folder, "analytics.csv"), header=None)
-
-    @classmethod
-    @abstractmethod
-    def create_analytics_csv(cls, input_folder, **kwargs):
-        """
-        Create the analytics.csv file at the location specified by dataset_folder
+        Creates the analytics.csv file at the location specified by input_folder
 
         Format of the file:
             file name: analytics.csv
@@ -244,22 +214,98 @@ class BaseSetup:
 
         Parameters
         ----------
-        input_folder : string
+        input_folder : str
             Path string that points to the dataset location
+        darwin_dataset : bool
+            Flag for using the darwin dataset class instead
+        train_ds : data.Dataset
+            Train split dataset
+        """
+        # If it already exists your job is done
+        if (Path(input_folder) / "analytics.csv").is_file():
+            return
+
+        logging.warning(f'Missing analytics.csv file for dataset located at {input_folder}')
+        logging.warning(f'Attempt creating analytics.csv file')
+
+        # Measure mean and std on train images
+        logging.info(f'Measuring mean and std on train images')
+        if darwin_dataset:
+            mean, std = train_ds.measure_mean_std()
+        else:
+            mean, std = cls._measure_mean_std(
+                input_folder=input_folder, train_ds=train_ds, **kwargs
+            )
+
+        # Measure weights for class balancing
+        logging.info(f'Measuring class wrights')
+        if darwin_dataset:
+            class_weights = train_ds.measure_weights()
+        else:
+            class_weights = cls._measure_weights(
+                input_folder=input_folder, train_ds=train_ds, **kwargs
+            )
+
+        # Save results as CSV file in the dataset folder
+        logging.info(f'Saving to analytics.csv')
+        df = pd.DataFrame([mean, std, class_weights])
+        df.index = ['mean[RGB]', 'std[RGB]', 'class_weights[num_classes]']
+        df.to_csv(Path(input_folder) / 'analytics.csv', header=False)
+        logging.warning(f'Created analytics.csv file for dataset located at {input_folder}')
+
+    @classmethod
+    def _measure_mean_std(cls, train_ds, **kwargs):
+        """Computes mean and std of train images, given the train loader
+
+        Parameters
+        ----------
+        train_ds : data.Dataset
+            Train split dataset
+
+        Returns
+        -------
+        mean : ndarray[double]
+            Mean value (for each channel) of all pixels of the images in the input folder
+        std : ndarray[double]
+            Standard deviation (for each channel) of all pixels of the images in the input folder
         """
         raise NotImplementedError
 
     @classmethod
-    def load_mean_std_from_file(cls, **kwargs):
+    def _measure_weights(cls, train_ds, **kwargs):
+        """Computes the class balancing weights (not the frequencies!!) given the train loader
+
+        Parameters
+        ----------
+        train_ds : data.Dataset
+            Train split dataset
+
+        Returns
+        -------
+        class_weights : ndarray[double]
+            Weight for each class in the train set (one for each class)
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def load_mean_std_from_file(cls, input_folder, **kwargs):
         """ Recover mean and std from the analytics.csv file
+
+        Parameters
+        ----------
+        input_folder : str
+            Path string that points to the three folder train/val/test. Example: ~/../../data/svhn
 
         Returns
         -------
         ndarray[double], ndarray[double]
             Mean and Std of the selected dataset, contained in the analytics.csv file.
         """
-        # Loads the analytics csv and extract mean and std
-        csv_file = cls._load_analytics_csv(**kwargs)
+        # Loads the analytics csv
+        if not (Path(input_folder) / "analytics.csv").exists():
+            raise SystemError(f"Analytics file not found in '{input_folder}'")
+        csv_file = pd.read_csv(Path(input_folder) / "analytics.csv", header=None)
+        # Extract mean and std
         for row in csv_file.values:
             if 'mean' in str(row[0]).lower():
                 mean = np.array(row[1:4], dtype=float)
@@ -271,16 +317,24 @@ class BaseSetup:
         return mean, std
 
     @classmethod
-    def load_class_weights_from_file(cls, **kwargs):
+    def load_class_weights_from_file(cls, input_folder, **kwargs):
         """ Recover class weights from the analytics.csv file (weights are the inverse of frequency)
+
+        Parameters
+        ----------
+        input_folder : str
+            Path string that points to the three folder train/val/test. Example: ~/../../data/svhn
 
         Returns
         -------
         ndarray[double]
             Class weights for the selected dataset, contained in the analytics.csv file.
         """
-        # Loads the analytics csv and extract mean and std
-        csv_file = cls._load_analytics_csv(**kwargs)
+        # Loads the analytics csv
+        if not (Path(input_folder) / "analytics.csv").exists():
+            raise SystemError(f"Analytics file not found in '{input_folder}'")
+        csv_file = pd.read_csv(Path(input_folder) / "analytics.csv", header=None)
+        # Extracts the weights
         for row in csv_file.values:
             if 'weights' in str(row[0]).lower():
                 weights = np.array([x for x in row[1:] if str(x) != 'nan'], dtype=float)
@@ -289,7 +343,7 @@ class BaseSetup:
             raise EOFError
         return weights
 
-    ####################################################################################################################
+    ################################################################################################
     # Dataloaders handling
     @classmethod
     def set_up_dataloaders(cls, **kwargs):
@@ -311,6 +365,9 @@ class BaseSetup:
 
         # Load the datasets
         train_ds, val_ds, test_ds = cls._get_datasets(**kwargs)
+
+        # Create the analytics csv
+        cls.create_analytics_csv(train_ds=train_ds, **kwargs)
 
         # Setup transforms
         logging.info('Setting up transforms')
@@ -347,10 +404,7 @@ class BaseSetup:
             Train, validation and test splits
         """
         if darwin_dataset:
-            pass
-            # Split the data into train/val/test folders
-            # TODO use darwin-py
-            # cls.split_darwin_dataset(input_folder=input_folder, **kwargs)
+            return cls.get_darwin_datasets(input_folder=input_folder, **kwargs)
 
         if not os.path.isdir(input_folder):
             raise RuntimeError("Dataset folder not found at " + input_folder)
@@ -370,6 +424,49 @@ class BaseSetup:
             raise RuntimeError("Test folder not found in the dataset_folder=" + input_folder)
         test_ds = cls.get_split(path=test_dir, **kwargs)
 
+        return train_ds, val_ds, test_ds
+
+    @classmethod
+    def get_darwin_datasets(cls, input_folder: Path, split_folder: Path, split_type: str, **kwargs):
+        """
+        Used darwin-py integration to loads the dataset from file system and provide
+        the dataset splits for train validation and test
+
+        Parameters
+        ----------
+        input_folder : Path
+            Path string that points to the dataset location
+        split_folder : Path
+            Path to the folder containing the split txt files
+        split_type : str
+            Type of the split txt file to choose. Either ['random', 'tags', 'polygon']
+
+        Returns
+        -------
+        train_ds : data.Dataset
+        val_ds : data.Dataset
+        test_ds : data.Dataset
+            Train, validation and test splits
+        """
+        assert input_folder is not None
+        input_folder = Path(input_folder)
+        assert input_folder.exists()
+        # Point to the full path split folder
+        assert split_folder is not None
+        split_folder = input_folder / "lists" / split_folder
+        assert split_folder.exists()
+
+        # Select classification datasets
+        from darwin.torch.dataset import Dataset
+        train_ds = Dataset(
+            root=input_folder, split=split_folder / (split_type + "_train.txt")
+        )
+        val_ds = Dataset(
+            root=input_folder, split=split_folder / (split_type + "_val.txt")
+        )
+        test_ds = Dataset(
+            root=input_folder, split=split_folder / (split_type + "_test.txt")
+        )
         return train_ds, val_ds, test_ds
 
     @classmethod
@@ -427,7 +524,7 @@ class BaseSetup:
                                                   pin_memory=True)
         return train_loader, val_loader, test_loader
 
-    ####################################################################################################################
+    ################################################################################################
     # Transforms handling
     @classmethod
     def set_up_transforms(cls, train_ds, val_ds, test_ds, **kwargs):
@@ -457,7 +554,7 @@ class BaseSetup:
         """Set up the target transform for all splits"""
         raise NotImplementedError
 
-    ####################################################################################################################
+    ################################################################################################
     # Checkpointing handling
     @classmethod
     def checkpoint(cls, epoch, new_value, best_value, log_dir, the_lower_the_better=None, checkpoint_all_epochs=False, **kwargs):
@@ -598,7 +695,7 @@ class BaseSetup:
             raise SystemExit
         return best_value
 
-    ####################################################################################################################
+    ################################################################################################
     # Learning rate handling
     @classmethod
     def warmup_lr_scheduler(cls, optimizer, warmup_iters, warmup_factor):

@@ -44,7 +44,7 @@ class ImageFolderTorchVision(ImageFolder):
             tuple: (sample, target) where target is class_index of the target class.
         """
         sample, target = super().__getitem__(index)
-        return sample, {'class':target}
+        return sample, {'category_id': target}
 
 
 class ImageFolderInMemory(data.Dataset):
@@ -113,7 +113,7 @@ class ImageFolderInMemory(data.Dataset):
             img = self.transform(img)
         if self.target_transform is not None:
             target = self.target_transform(target)
-        return img, {'class':target}
+        return img, {'category_id': target}
 
     def __len__(self):
         return len(self.data)

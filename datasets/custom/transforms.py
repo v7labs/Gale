@@ -1,23 +1,63 @@
 """
 This file stores the library of custom transformations.
-Please use a naming scheme that MAKES SENSE i.e., random crops does actually take random crops and not other stuff.
-Try to avoid having duplicates and document especially input/output types ;)
+Please use a naming scheme that MAKES SENSE i.e., random crops does actually take random crops and
+not other stuff. Try to avoid having duplicates and document especially input/output types ;)
 """
 
+import math
 # Utils
 import random
+from collections import Callable
 
-import math
 import torch
 from PIL import Image
-from torchvision.transforms import functional as F, Pad
+from torchvision.transforms import Pad, functional as F
 
 
-########################################################################################################################
-########################################################################################################################
+####################################################################################################
+####################################################################################################
+# Wrapper Transformations
+####################################################################################################
+####################################################################################################
+class OnlyImage(object):
+    """Wrapper function around a single parameter transform. It will be cast only on image"""
+
+    def __init__(self, transform: Callable):
+        """Initialize the transformation with the transformation to be called.
+        Could be a compose.
+
+        Parameters
+        ----------
+        transform : torchvision.transforms.transforms
+            Transformation to wrap
+        """
+        self.transform = transform
+
+    def __call__(self, image, target):
+        return self.transform(image), target
+
+class OnlyTarget(object):
+    """Wrapper function around a single parameter transform. It will be cast only on target"""
+
+    def __init__(self, transform: Callable):
+        """Initialize the transformation with the transformation to be called.
+        Could be a compose.
+
+        Parameters
+        ----------
+        transform : torchvision.transforms.transforms
+            Transformation to wrap
+        """
+        self.transform = transform
+
+    def __call__(self, image, target):
+        return image, self.transform(target)
+
+####################################################################################################
+####################################################################################################
 # Single Transformations
-########################################################################################################################
-########################################################################################################################
+####################################################################################################
+####################################################################################################
 class ResizePad(object):
     """
     Perform resizing keeping the aspect ratio of the image --padding type: continuous (black).
@@ -155,11 +195,11 @@ class ResizePad(object):
         img = self.resize_with_padding(img, self.target_size)
         return img
 
-########################################################################################################################
-########################################################################################################################
+####################################################################################################
+####################################################################################################
 # Twin Transformations
-########################################################################################################################
-########################################################################################################################
+####################################################################################################
+####################################################################################################
 
 class TwinCompose(object):
     def __init__(self, transforms):
@@ -175,7 +215,7 @@ class TwinRandomCrop(object):
     """Crop the given PIL Images at the same random location"""
 
     def __init__(self, crop_size):
-            self.crop_size = crop_size
+        self.crop_size = crop_size
 
     def get_params(self, img_size):
         """Get parameters for ``crop`` for a random crop"""

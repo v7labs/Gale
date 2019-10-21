@@ -15,14 +15,15 @@ class BaseCLArguments:
         self.parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                               description='Template for training a network on a dataset')
         # Add all options
-        self._general_parameters(self.parser)
-        self._sigopt_options(self.parser)
-        self._data_options(self.parser)
-        self._training_options(self.parser)
-        self._optimizer_options(self.parser)
-        self._criterion_options(self.parser)
-        self._system_options(self.parser)
-        self._inference_parameters(self.parser)
+        self._general_parameters()
+        self._sigopt_options()
+        self._darwin_options()
+        self._data_options()
+        self._training_options()
+        self._optimizer_options()
+        self._criterion_options()
+        self._system_options()
+        self._inference_parameters()
 
     def parse_arguments(self, args=None):
         """ Parse the command line arguments provided
@@ -49,21 +50,23 @@ class BaseCLArguments:
 
         return args, self.parser
 
-    def _general_parameters(self, parser):
+    def _general_parameters(self):
         """ General options """
-        parser_general = parser.add_argument_group('GENERAL', 'General Options')
+        parser_general = self.parser.add_argument_group('GENERAL', 'General Options')
         parser_general.add_argument('-rc', '--runner-class')  # Do not remove! See RunMe()._parse_arguments()
         parser_general.add_argument('--experiment-name',
                                     type=str,
                                     default=None,
                                     help='provide a meaningful and descriptive name to this run')
         parser_general.add_argument('--input-folder',
+                                    type=str,
                                     help='location of the dataset on the machine e.g root/data',
                                     required=False)
         parser_general.add_argument('--input-image',
                                     help='an image to process, encoded in base64',
                                     required=False)
         parser_general.add_argument('--output-folder',
+                                    type=str,
                                     default='./output/',
                                     help='where to save all output files.', )
         parser_general.add_argument('--quiet',
@@ -93,10 +96,10 @@ class BaseCLArguments:
                                     action='store_true',
                                     help='Generates qualitative results from the validation set.')
 
-    def _sigopt_options(self, parser):
+    def _sigopt_options(self):
         """ SigOpt options"""
 
-        parser_sigopt = parser.add_argument_group('GENERAL', 'General Options')
+        parser_sigopt = self.parser.add_argument_group('GENERAL', 'General Options')
         parser_sigopt.add_argument('--sig-opt',
                                    type=str,
                                    default=None,
@@ -114,9 +117,29 @@ class BaseCLArguments:
                                    default=None,
                                    help='place your SigOpt project name ere.')
 
-    def _system_options(self, parser):
+    def _darwin_options(self):
+        """ SigOpt options"""
+
+        parser_darwin = self.parser.add_argument_group('GENERAL', 'General Options')
+        parser_darwin.add_argument('--darwin-dataset',
+                                   default=False,
+                                   action='store_true',
+                                   help='flag for using the darwin_dataset.py dataset')
+        parser_darwin.add_argument('--split-folder',
+                                   type=str,
+                                   default="split_v10_t20_s42",
+                                   help='path to the folder containing the split txt files',
+                                   required=False)
+        parser_darwin.add_argument('--split-type',
+                                   type=str,
+                                   choices=['random', 'stratified_tag', 'stratified_polygon'],
+                                   default=None,
+                                   help='type of the split txt file to choose',
+                                   required=False)
+
+    def _system_options(self):
         """ System options """
-        parser_system = parser.add_argument_group('SYS', 'System Options')
+        parser_system = self.parser.add_argument_group('SYS', 'System Options')
         parser_system.add_argument('--gpu-id',
                                    type=int, nargs='*',
                                    default=None,
@@ -137,17 +160,13 @@ class BaseCLArguments:
                                    default=4,
                                    help='workers used for train/val loaders')
 
-    def _data_options(self, parser):
+    def _data_options(self):
         """ Defines all parameters relative to the data. """
-        parser_data = parser.add_argument_group('DATA', 'Dataset Options')
+        parser_data = self.parser.add_argument_group('DATA', 'Dataset Options')
         parser_data.add_argument('--inmem',
                                  default=False,
                                  action='store_true',
                                  help='attempt to load the entire image dataset in memory')
-        parser_data.add_argument('--darwin-dataset',
-                                 default=False,
-                                 action='store_true',
-                                 help='flag for using the darwin_dataset.py dataset')
         parser_data.add_argument("--darwin-splits",
                                  default=[70.0, 10.0, 20.0],
                                  type=float,
@@ -166,13 +185,13 @@ class BaseCLArguments:
                                  action='store_true',
                                  help='enable the deep dataset integrity verification')
 
-    def _training_options(self, parser):
+    def _training_options(self):
         """ Training options """
         # List of possible custom models already implemented
         # NOTE: If a model is missing and you get a argument parser error: check in the init file of models if its there!
         model_options = [name for name in models.__dict__ if callable(models.__dict__[name])]
 
-        parser_train = parser.add_argument_group('TRAIN', 'Training Options')
+        parser_train = self.parser.add_argument_group('TRAIN', 'Training Options')
         parser_train.add_argument('--model-name',
                                   type=str,
                                   choices=model_options,
@@ -217,12 +236,12 @@ class BaseCLArguments:
                                   default=False,
                                   help='make a checkpoint after every epoch')
 
-    def _optimizer_options(self, parser):
+    def _optimizer_options(self):
         """ Options specific for optimizers """
         # List of possible optimizers already implemented in PyTorch
         optimizer_options = [name for name in torch.optim.__dict__ if callable(torch.optim.__dict__[name])]
         lrscheduler_options = [name for name in torch.optim.lr_scheduler.__dict__ if callable(torch.optim.lr_scheduler.__dict__[name])]
-        parser_optimizer = parser.add_argument_group('OPTIMIZER', 'Optimizer Options')
+        parser_optimizer = self.parser.add_argument_group('OPTIMIZER', 'Optimizer Options')
 
         parser_optimizer.add_argument('--optimizer-name',
                                       choices=optimizer_options,
@@ -271,16 +290,16 @@ class BaseCLArguments:
                                       type=float,
                                       help='decrease lr by a factor of lr-gamma')
 
-    def _criterion_options(self, parser):
+    def _criterion_options(self):
         """ Options specific for optimizers """
-        parser_optimizer = parser.add_argument_group('CRITERION', 'Criterion Options')
+        parser_optimizer = self.parser.add_argument_group('CRITERION', 'Criterion Options')
         parser_optimizer.add_argument('--criterion-name',
                                       default='CrossEntropyLoss',
                                       help='criterion to be used for training')
 
-    def _inference_parameters(self, parser):
+    def _inference_parameters(self):
         """ General options """
-        parser_inference = parser.add_argument_group('INFERENCE', 'Inference Options')
+        parser_inference = self.parser.add_argument_group('INFERENCE', 'Inference Options')
         parser_inference.add_argument('--pre-load',
                                       default=False,
                                       action='store_true',

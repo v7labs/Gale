@@ -66,9 +66,10 @@ class BaseRoutine:
                                    multi_run_label=multi_run_label,
                                    **kwargs)
 
-            # Update the LR according to the scheduler
-            for lr_scheduler in batch_lr_schedulers:
-                lr_scheduler.step()
+            # Update the LR according to the scheduler, only during training
+            if not 'val' in logging_label and not 'test' in logging_label:
+                for lr_scheduler in batch_lr_schedulers:
+                    lr_scheduler.step()
 
             # Add metrics to Tensorboard for the last mini-batch value
             for tag, meter in MetricLogger():
