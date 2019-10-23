@@ -259,6 +259,9 @@ class RunMe:
                 csc = csc.union(get_all_concrete_subclasses(c))
             return csc
 
+        # Set up execution environment. Specify CUDA_VISIBLE_DEVICES and seeds
+        cls._set_up_env(**kwargs)
+
         # Find all subclasses of AbstractRunner and BaseRunner and select the chosen one among them based on -rc
         sub_classes = get_all_concrete_subclasses(AbstractRunner)
         runner_class = [c for c in sub_classes if to_capital_camel_case(runner_class).lower() == c.__name__.lower()]
@@ -485,7 +488,9 @@ class RunMe:
             if group.title not in ['GENERAL', 'DATA']:
                 for action in group._group_actions:
                     if (kwargs[action.dest] is not None) and (
-                            kwargs[action.dest] != action.default) and action.dest != 'load_model' and action.dest != 'input_image' :
+                            kwargs[action.dest] != action.default) \
+                            and action.dest != 'load_model' \
+                            and action.dest != 'input_image':
                         non_default_parameters.append(str(action.dest) + "=" + str(kwargs[action.dest]))
 
         # Build up final logging folder tree with the non-default training parameters
@@ -628,7 +633,7 @@ class RunMe:
         else:
             try:
                 assert multi_run is None
-            except:
+            except Exception:
                 logging.error('Arguments for seed AND multi-run should not be active at the same time!')
                 raise SystemExit
 
