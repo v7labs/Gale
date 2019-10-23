@@ -26,7 +26,7 @@ OUTPUT_PATH = Path().absolute() / 'test_output'
 @pytest.fixture(autouse=True)
 def run_around_tests():
     # Prepare the folders
-    print("Preparing data and logs  folders")
+    print("Preparing data and logs folders")
     INPUT_PATH.mkdir(exist_ok=True)
     OUTPUT_PATH.mkdir(exist_ok=True)
     # A test function will be run at this point
