@@ -4,13 +4,11 @@ from typing import Optional
 
 from darwin.client import Client
 from darwin.dataset.utils import split_dataset
-from darwin.torch import ClassificationDataset, InstanceSegmentationDataset, \
-    SemanticSegmentationDataset
 
 
 def get_darwin_dataset(
         *,
-        team_slug: str,
+        team_slug: Optional[str] = None,
         dataset_slug: Optional[str] = None,
         dataset_id: Optional[str] = None,
         projects_dir: Optional[str] = None,
