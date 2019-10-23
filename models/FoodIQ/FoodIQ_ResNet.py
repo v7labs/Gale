@@ -14,7 +14,7 @@ class FoodIQ_ResNet(ResNet):
 
     expected_input_size = (224, 224)
 
-    def __init__(self, block, train_loader=None, output_channels=None, **kwargs):
+    def __init__(self, block, train_loader=None, num_classes=None, **kwargs):
         """
         Creates a parent class model and replaces the classification layer with hydra heads for FoodIQ use-case.
 
@@ -23,16 +23,16 @@ class FoodIQ_ResNet(ResNet):
         train_loader : torch.utils.data.DataLoader
             The dataloader of the training set.
         """
-        super().__init__(block=block, output_channels=1, **kwargs)  # output_channels=1 is deliberate as its not used!
+        super().__init__(block=block, num_classes=1, **kwargs)  # output_channels=1 is deliberate as its not used!
 
         # Hydra heads: fully connected layers for classification (expected size: 512 * block.expansion)
         self.hydra = nn.ModuleList()
         if train_loader is not None:
             # This happens at train time, where the train loader exists
             d = train_loader.dataset.num_classes
-        elif type(output_channels) == dict:
+        elif type(num_classes) == dict:
             # This is used at inference time, where the number of classes is known only trough loading the model.pth
-            d = {k:len(v) for k, v in output_channels.items()}
+            d = {k:len(v) for k, v in num_classes.items()}
         else:
             raise AttributeError
         for k, v in d.items():
