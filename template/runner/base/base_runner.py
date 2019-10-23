@@ -248,24 +248,19 @@ class BaseRunner(AbstractRunner):
         """
 
         # Load the best model before evaluating on the test set (early stopping)
-        logging.info('Loading the best model before evaluating on the test set.')
-
-        if kwargs["load_model"] is not None:
-            if not os.path.exists(kwargs["load_model"]):
-                logging.error(f"Could not find model {kwargs['load_model']}. Terminating.")
-                raise SystemExit
-        elif os.path.exists(os.path.join(current_log_folder, 'best.pth')):
+        if os.path.exists(os.path.join(current_log_folder, 'best.pth')):
+            logging.info('Loading the best model before evaluating on the test set.')
             kwargs["load_model"] = os.path.join(current_log_folder, 'best.pth')
-        else:
+        elif os.path.exists(os.path.join(current_log_folder, 'checkpoint.pth')):
             logging.warning('File model_best.pth.tar not found in {}'.format(current_log_folder))
             logging.warning('Using checkpoint.pth.tar instead')
-            if os.path.exists(os.path.join(current_log_folder, 'checkpoint.pth')):
-                kwargs["load_model"] = os.path.join(current_log_folder, 'checkpoint.pth')
-            else:
-                logging.warning('File checkpoint.pth.tar not found in {}'.format(current_log_folder))
-                logging.error('Both best.pth and checkpoint.pth are not not found in {}. Terminating.'
-                              .format(current_log_folder))
-                raise SystemExit
+            kwargs["load_model"] = os.path.join(current_log_folder, 'checkpoint.pth')
+        elif kwargs["load_model"] is not None:
+            if not os.path.exists(kwargs["load_model"]):
+                raise SystemExit(f"Could not find model {kwargs['load_model']}. Terminating.")
+        else:
+            raise SystemExit(f'Both best.pth and checkpoint.pth are not not found in'
+                             f' {current_log_folder}. No --load-model provided -> Terminating.')
 
         model = self.setup.setup_model(**kwargs)
 

@@ -26,3 +26,25 @@ for module in modules:
 # Expose all the models
 for m in MODEL_REGISTRY:
     globals()[m] = MODEL_REGISTRY[m]
+
+
+model_zoo = {
+    "fcn_resnet50_coco":
+        None,
+    "fcn_resnet101_coco":
+        "https://download.pytorch.org/models/fcn_resnet101_coco-7ecb50ca.pth",
+    "deeplabv3_resnet50_coco":  # TODO: upload to AWS
+        "/home/jon/.torch/deeplabv3_resnet50_coco.pth",
+    "deeplabv3_resnet101_coco":
+        "https://download.pytorch.org/models/deeplabv3_resnet101_coco-586e9e4e.pth",
+    "deeplabv3_resnet50_openimages":
+        None,
+    "deeplabv3_resnet101_openimages":
+        None,
+    "deeplabv3plus_resnet50_coco":  # TODO: upload to AWS
+        "/home/jon/.torch/deeplabv3plus_resnet50_coco.pth",
+    'fasterrcnn_resnet50_fpn_coco':
+        'https://download.pytorch.org/models/fasterrcnn_resnet50_fpn_coco-258fb6c6.pth',
+    'maskrcnn_resnet50_fpn_coco':
+        'https://download.pytorch.org/models/maskrcnn_resnet50_fpn_coco-bf2d0c1e.pth'
+}

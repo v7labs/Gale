@@ -209,15 +209,11 @@ class BaseCLArguments:
                                   action='store_true',
                                   default=False,
                                   help='use pretrained model. (Not applicable for all models)')
-        parser_train.add_argument("--pretrained-weights",
-                                  dest="pretrained_weights",
-                                  type=str,
-                                  default=None,
-                                  help="Use pre-trained models from the modelzoo")
         parser_train.add_argument('--load-model',
                                   type=str,
                                   default=None,
-                                  help='path to latest checkpoint')
+                                  help='path to latest checkpoint or'
+                                       'use pre-trained models from the modelzoo')
         parser_train.add_argument('--resume',
                                   type=str,
                                   default=None,

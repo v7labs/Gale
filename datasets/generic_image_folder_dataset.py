@@ -43,7 +43,11 @@ class ImageFolderTorchVision(ImageFolder):
         Returns:
             tuple: (sample, target) where target is class_index of the target class.
         """
-        sample, target = super().__getitem__(index)
+        path, target = self.samples[index]
+        sample = self.loader(path)
+        if self.transform is not None:
+            sample, target = self.transform(sample, target)
+
         return sample, {'category_id': target}
 
 
@@ -110,9 +114,7 @@ class ImageFolderInMemory(data.Dataset):
 
         img, target = self.data[index], self.labels[index]
         if self.transform is not None:
-            img = self.transform(img)
-        if self.target_transform is not None:
-            target = self.target_transform(target)
+            img, target = self.transform(img, target)
         return img, {'category_id': target}
 
     def __len__(self):

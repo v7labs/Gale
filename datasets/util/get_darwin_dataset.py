@@ -4,12 +4,15 @@ from typing import Optional
 
 from darwin.client import Client
 from darwin.dataset.utils import split_dataset
+from darwin.torch import ClassificationDataset, InstanceSegmentationDataset, \
+    SemanticSegmentationDataset
 
 
 def get_darwin_dataset(
         *,
         team_slug: str,
-        dataset_slug: str,
+        dataset_slug: Optional[str] = None,
+        dataset_id: Optional[str] = None,
         projects_dir: Optional[str] = None,
         token: Optional[str] = None,
         config_path: Optional[Path] = None,
@@ -58,18 +61,19 @@ def get_darwin_dataset(
     """
     # Authenticate client. The priority of the cases is arbitrarily chosen and should actually not matter
     if email is not None and password is not None:
-        client =  Client.login(email=email, password=password, projects_dir=projects_dir)
+        client = Client.login(email=email, password=password, projects_dir=projects_dir)
     elif token is not None:
         client = Client.from_token(token=token, projects_dir=projects_dir)
     elif config_path is not None:
         client = Client.from_config(config_path=config_path)
     else:
-        client = Client.default()
+        client = Client.default(projects_dir=projects_dir)
 
     # Select the desired team
-    client.set_team(slug=team_slug)
+    if team_slug is not None:
+        client.set_team(slug=team_slug)
     # Get the remote dataset
-    dataset = client.get_remote_dataset(slug=dataset_slug)
+    dataset = client.get_remote_dataset(slug=dataset_slug, dataset_id=dataset_id)
     # Download the data on the file system
     dataset.pull()
     # Split the dataset with the param required
@@ -82,6 +86,8 @@ def get_darwin_dataset(
     )
 
 
+
+
 if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -92,11 +98,15 @@ if __name__ == "__main__":
                         type=Path)
     parser.add_argument('--dataset-slug',
                         help='Dataset slug (see Darwin documentation)',
-                        required=True,
+                        default=None,
+                        type=str)
+    parser.add_argument('--dataset-id',
+                        help='Dataset ID (see Darwin documentation)',
+                        default=None,
                         type=str)
     parser.add_argument('--team-slug',
                         help='Team slug (see Darwin documentation)',
-                        required=True,
+                        default=None,
                         type=str)
     parser.add_argument('--token',
                         help='Token to authenticate the client',
@@ -139,6 +149,3 @@ if __name__ == "__main__":
 
     # Run the actual code
     get_darwin_dataset(**args.__dict__)
-
-
-

@@ -4,9 +4,9 @@ import logging
 import os
 # Torch related stuff
 import shutil
-import sys
 from abc import abstractmethod
 from pathlib import Path
+from torch.hub import load_state_dict_from_url
 
 import numpy as np
 import pandas as pd
@@ -17,6 +17,7 @@ import torch.optim
 import torch.utils.data
 
 import models
+from models import model_zoo
 from datasets.util.dataset_integrity import verify_dataset_integrity
 
 
@@ -37,7 +38,7 @@ class BaseSetup:
     ################################################################################################
     # General setup: model, optimizer, lr scheduler and criterion
     @classmethod
-    def setup_model(cls, model_name, no_cuda, num_classes=None, load_model=None, strict=True, **kwargs):
+    def setup_model(cls, model_name, no_cuda, num_classes=None, load_model=None, strict=False, **kwargs):
         """Setup the model, load and move to GPU if necessary
 
         Parameters
@@ -50,7 +51,7 @@ class BaseSetup:
             How many different classes there are in our problem. Used for loading the model.
         load_model : string
             Path to a saved model
-        stric : bool
+        strict : bool
             Enforces key match between loaded state_dict and model definition
 
         Returns
@@ -60,33 +61,68 @@ class BaseSetup:
         """
         # Load saved model dictionary
         if load_model:
+            state_dict = None
             if not os.path.isfile(load_model):
-                logging.error("No model dict found at '{}'".format(load_model))
-                raise SystemExit
-            logging.info('Loading a saved model')
-            checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage)
-            if 'model_name' in checkpoint:
-                model_name = checkpoint['model_name']
-            # Override the number of classes based on the size of the last layer in the dictionary
-            if num_classes is None or type(num_classes) == int:
-                num_classes = next(reversed(checkpoint['state_dict'].values())).shape[0]
+                # If it is not a valid path it will try to get the checkpoint
+                # from the model zoo
+                model_key = model_name + "_" + load_model
+                if model_key not in model_zoo:
+                    logging.error(f"No model dict found at '{load_model}'")
+                    raise SystemExit
+                load_model = model_zoo[model_key]
+            logging.info(f"Loading a model from {load_model}")
+            if load_model.startswith("http"):
+                state_dict = load_state_dict_from_url(load_model, progress=False)
+            else:
+                checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage)
+                # Check consistency with model_name
+                if 'model_name' in checkpoint:
+                    if model_name is None:
+                        model_name = checkpoint["model_name"]
+                    elif model_name != checkpoint["model_name"]:
+                        raise ValueError(f"name of the model in checkpoint does not match with --model-name. "
+                                         "{checkpoint['model_name']} != {model_name}")
+                # Override the number of classes based on the list of classes in
+                # the checkpoint
+                if num_classes is None:
+                    num_classes = len(checkpoint["classes"])
+                elif num_classes != len(checkpoint["classes"]):
+                        raise ValueError(f"number of classes in checkpoint does not match with --num-classes. "
+                                         "{len(checkpoint['classes'])} != {num_classes}")
+
+                if "state_dict" in checkpoint:
+                    state_dict = checkpoint["state_dict"]
+                elif "model" in checkpoint:  # Clicker legacy. Eventually should be removed
+                    state_dict = checkpoint["model"]
+                else:
+                    raise AttributeError(f"Could not find state dictionary in checkpoint {load_model}")
+
+            assert state_dict is not None, f"Could not load a state dictionary from {load_model}"
 
         # Initialize the model
         logging.info('Setting up model {}'.format(model_name))
-        model = models.__dict__[model_name](output_channels=num_classes, **kwargs)
+        # For all arguments declared in the constructor signature of the
+        # selected model
+        args = {}
+        for p in inspect.getfullargspec(models.__dict__[model_name]).args:
+            # Add it to a dictionary in case it exists a corresponding value in kwargs
+            if p in kwargs:
+                args.update({p: kwargs[p]})
+        args["num_classes"] = num_classes
+        model = models.__dict__[model_name](**args)
+
+        # Load saved model weights
+        if load_model:
+            try:
+                model.load_state_dict(state_dict, strict=strict)
+            except Exception as exp:
+                logging.warning(exp)
 
         # Transfer model to GPU
         if not no_cuda:
             logging.info('Transfer model to GPU')
             model = torch.nn.DataParallel(model).cuda()
             cudnn.benchmark = True
-
-        # Load saved model weights
-        if load_model:
-            try:
-                model.load_state_dict(checkpoint['state_dict'], strict=strict)
-            except Exception as exp:
-                logging.warning(exp)
 
         return model
 
@@ -113,14 +149,16 @@ class BaseSetup:
         # Verify the optimizer exists
         assert optimizer_name in torch.optim.__dict__
 
-        params = {}
+        params = [p for p in model.parameters() if p.requires_grad]
+
+        args = {}
         # For all arguments declared in the constructor signature of the selected optimizer
         for p in inspect.getfullargspec(torch.optim.__dict__[optimizer_name].__init__).args:
             # Add it to a dictionary in case it exists a corresponding value in kwargs
             if p in kwargs:
-                params.update({p: kwargs[p]})
-        # Create an return the optimizer with the correct list of parameters
-        return torch.optim.__dict__[optimizer_name](model.parameters(), **params)
+                args.update({p: kwargs[p]})
+
+        return torch.optim.__dict__[optimizer_name](params, **args)
 
     @classmethod
     def get_lrscheduler(cls, lrscheduler_name, **kwargs):
@@ -190,7 +228,7 @@ class BaseSetup:
                 logging.info('Loading weights for data balancing')
                 weights = cls.load_class_weights_from_file(**kwargs)
                 criterion.weight = torch.from_numpy(weights).type(torch.FloatTensor)
-            except:
+            except Exception:
                 logging.warning('Unable to load information for data balancing. Using normal criterion')
 
         if not no_cuda:
@@ -512,16 +550,13 @@ class BaseSetup:
         train_loader = torch.utils.data.DataLoader(train_ds,
                                                    shuffle=True,
                                                    batch_size=batch_size,
-                                                   num_workers=workers,
-                                                   pin_memory=True)
+                                                   num_workers=workers)
         val_loader = torch.utils.data.DataLoader(val_ds,
                                                  batch_size=batch_size,
-                                                 num_workers=workers,
-                                                 pin_memory=True)
+                                                 num_workers=workers)
         test_loader = torch.utils.data.DataLoader(test_ds,
                                                   batch_size=batch_size,
-                                                  num_workers=workers,
-                                                  pin_memory=True)
+                                                  num_workers=workers)
         return train_loader, val_loader, test_loader
 
     ################################################################################################
@@ -637,15 +672,20 @@ class BaseSetup:
             classes = None
         try:
             expected_input_size = model.module.expected_input_size
-        except:
+        except Exception:
             expected_input_size = None
+
+        if isinstance(model, torch.nn.DataParallel):
+            state_dict = model.module.state_dict()
+        else:
+            state_dict = model.state_dict()
 
         d = {
             'epoch': epoch + 1,
             'arch': str(type(model)),
             'expected_input_size': expected_input_size,
             'model_name': model_name,
-            'state_dict': model.state_dict(),
+            'state_dict': state_dict,
             'best_value': best_value,
             'classes': classes,
             'train_transform': train_transform,

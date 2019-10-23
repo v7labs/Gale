@@ -134,6 +134,8 @@ class BaseRoutine:
                 if isinstance(elem, dict):
                     for k, v in elem.items():
                         elem[k] = move_to_cuda(v)
+                elif isinstance(elem, (list, tuple)):
+                    elem = [move_to_cuda(e) for e in elem]
                 else:
                     elem = elem.cuda(non_blocking=True)
             return elem
