@@ -254,7 +254,7 @@ class BaseCLArguments:
         parser_optimizer.add_argument('--wd', '--weight-decay',
                                       type=float,
                                       dest='weight_decay',
-                                      default=0,
+                                      default=1e-4,
                                       help='weight_decay coefficient, also known as L2 regularization')
         parser_optimizer.add_argument('--lr',
                                       type=float,
@@ -284,6 +284,7 @@ class BaseCLArguments:
                                       help='decrease lr every at each given milestone epoch')
         parser_optimizer.add_argument('--gamma',
                                       type=float,
+                                      default=0.1,
                                       help='decrease lr by a factor of lr-gamma')
 
     def _criterion_options(self):
