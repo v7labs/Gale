@@ -22,7 +22,7 @@ from util.misc import pil_loader
 
 class BaseInference(AbstractRunner):
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Attributes
         ----------
@@ -30,8 +30,13 @@ class BaseInference(AbstractRunner):
             (strategy design pattern) Object responsible for setup operations
         """
         self.setup = BaseSetup()
+        # Load model
+        self.model = self.setup.setup_model(**kwargs)
+        checkpoint = self._load_checkpoint(**kwargs)
+        self.transform = checkpoint['test_transform']
+        self.classes = checkpoint['classes']
 
-    def single_run(self, pre_load, **kwargs):
+    def single_run(self, **kwargs):
         """ Performs inference only
 
         Parameters
@@ -44,21 +49,17 @@ class BaseInference(AbstractRunner):
         The output of the inference
         """
         # Load the model if it does not exist yet
-        if not hasattr(self, 'model') or not hasattr(self, 'transform'):
-            self.model = self.setup.setup_model(**kwargs)
-            checkpoint = self._load_checkpoint(**kwargs)
-            self.transform = checkpoint['test_transform']
-            self.classes = checkpoint['classes']
+        if not hasattr(self, 'model'):
+            raise AttributeError("model not loaded")
 
-        if not pre_load:
-            # Load and preprocess the data
-            img = self.preprocess(**kwargs)
+        # Load and preprocess the data
+        img = self.preprocess(**kwargs)
 
-            # Forward Pass
-            output = self.model(img)
+        # Forward Pass
+        output = self.model(img)
 
-            # Return postprocessed output
-            return self.postprocess(output, **kwargs)
+        # Return postprocessed output
+        return self.postprocess(output, **kwargs)
 
     ####################################################################################################################
     """

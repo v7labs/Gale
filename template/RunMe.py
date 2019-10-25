@@ -270,7 +270,7 @@ class RunMe:
 
         # Run the actual experiment
         start_time = time.time()
-        return_value = runner_class().single_run(**kwargs)
+        return_value = runner_class(**kwargs).single_run(**kwargs)
         print(f'Payload (RunMe.py): {return_value}')
         print(f'Time taken: {(time.time() - start_time) * 1000:.0f}ms')
         return return_value

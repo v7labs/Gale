@@ -86,8 +86,6 @@ def get_darwin_dataset(
     )
 
 
-
-
 if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
