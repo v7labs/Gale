@@ -71,7 +71,7 @@ class DenseNet(nn.Module):
     """
     expected_input_size = (224, 224)
 
-    def __init__(self, output_channels, growth_rate=32, block_config=(6, 12, 24, 16),
+    def __init__(self, num_classes, growth_rate=32, block_config=(6, 12, 24, 16),
                  num_init_features=64, bn_size=4, drop_rate=0,
                  ablate=False, **kwargs):
 
@@ -104,7 +104,7 @@ class DenseNet(nn.Module):
 
         # Linear layer
         if not self.ablate:
-            self.classifier = nn.Linear(num_features, output_channels)
+            self.classifier = nn.Linear(num_features, num_classes)
 
     def forward(self, x):
         features = self.features(x)
