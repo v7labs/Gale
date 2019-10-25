@@ -254,7 +254,7 @@ class BaseCLArguments:
         parser_optimizer.add_argument('--wd', '--weight-decay',
                                       type=float,
                                       dest='weight_decay',
-                                      default=1e-4,
+                                      default=0,
                                       help='weight_decay coefficient, also known as L2 regularization')
         parser_optimizer.add_argument('--lr',
                                       type=float,
