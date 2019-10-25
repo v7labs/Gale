@@ -284,6 +284,7 @@ class BaseCLArguments:
                                       help='decrease lr every at each given milestone epoch')
         parser_optimizer.add_argument('--gamma',
                                       type=float,
+                                      default=0.1,
                                       help='decrease lr by a factor of lr-gamma')
 
     def _criterion_options(self):

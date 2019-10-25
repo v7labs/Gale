@@ -187,7 +187,7 @@ class BaseSetup:
             # Add it to a dictionary in case it exists a corresponding value in kwargs
             if p in kwargs:
                 params.update({p: kwargs[p]})
-        # Create an return the optimizer with the correct list of parameters
+        # Create and return the optimizer with the correct list of parameters
         return torch.optim.lr_scheduler.__dict__[lrscheduler_name](**params)
 
     @classmethod
