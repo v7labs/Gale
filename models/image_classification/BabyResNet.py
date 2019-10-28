@@ -44,7 +44,7 @@ class BabyResNet(nn.Module):
     """
     expected_input_size = (32, 32)
 
-    def __init__(self, block_type, num_block, output_channels, **kwargs):
+    def __init__(self, block_type, num_block, num_classes, **kwargs):
         """
         Creates a BabyResNet model from the scratch.
 
@@ -81,7 +81,7 @@ class BabyResNet(nn.Module):
             Type of the blocks to be used in the network. Either _BasickBlock or _BottleNeck.
         num_block : List(int)
             Number of blocks to put in each layer of the network. Must be of size 4
-        output_channels : int
+        num_classes : int
             Number of neurons in the last layer
         """
         super(BabyResNet, self).__init__()
@@ -106,7 +106,7 @@ class BabyResNet(nn.Module):
         self.avgpool = nn.AvgPool2d(kernel_size=7, stride=1)
         self.fc = nn.Sequential(
             Flatten(),
-            nn.Linear(512 * block_type.expansion, output_channels),
+            nn.Linear(512 * block_type.expansion, num_classes),
         )
 
         # Initialize the weights of all layers

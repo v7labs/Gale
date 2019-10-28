@@ -99,7 +99,7 @@ class ResNet(nn.Module):
 
     expected_input_size = (224, 224)
 
-    def __init__(self, block, layers, output_channels, ablate=False, **kwargs):
+    def __init__(self, block, layers, num_classes, ablate=False, **kwargs):
         self.inplanes = 64
         super(ResNet, self).__init__()
 
@@ -116,7 +116,7 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         self.avgpool = nn.AvgPool2d(7, stride=1)
         if not ablate:
-            self.fc = nn.Linear(512 * block.expansion, output_channels)
+            self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
