@@ -84,8 +84,6 @@ def get_darwin_dataset(
     )
 
 
-
-
 if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -122,19 +120,19 @@ if __name__ == "__main__":
                         help='User pwd, for auth',
                         default=None,
                         type=str)
-    parser.add_argument('--val_percentage',
+    parser.add_argument('--val-percentage',
                         help='User pwd, for auth',
                         default=0.1,
                         type=float)
-    parser.add_argument('--test_percentage',
+    parser.add_argument('--test-percentage',
                         help='User pwd, for auth',
                         default=0.2,
                         type=float)
-    parser.add_argument('--force_resplit',
+    parser.add_argument('--force-resplit',
                         help='User pwd, for auth',
                         default=False,
                         type=bool)
-    parser.add_argument('--split_seed',
+    parser.add_argument('--split-seed',
                         help='User pwd, for auth',
                         default=42,
                         type=int)

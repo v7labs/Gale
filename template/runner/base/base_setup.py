@@ -567,9 +567,11 @@ class BaseSetup:
         # Assign the transform to splits
         train_ds.transform = cls.get_train_transform(**kwargs)
         for ds in [val_ds, test_ds]:
-            ds.transform = cls.get_test_transform(**kwargs)
+            if ds is not None:
+                ds.transform = cls.get_test_transform(**kwargs)
         for ds in [train_ds, val_ds, test_ds]:
-            ds.target_transform = cls.get_target_transform(**kwargs)
+            if ds is not None:
+                ds.target_transform = cls.get_target_transform(**kwargs)
 
     @classmethod
     @abstractmethod

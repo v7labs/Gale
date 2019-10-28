@@ -113,7 +113,7 @@ class BaseInference(AbstractRunner):
     def _load_image(self, input_folder):
         """Load the image from the file system"""
         if not os.path.exists(input_folder):
-            raise FileNotFoundError
+            raise FileNotFoundError("Could not find file {input_folder}")
         img = pil_loader(input_folder)
         return img
 
