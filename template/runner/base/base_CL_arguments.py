@@ -1,5 +1,6 @@
 # Utils
 import argparse
+import json
 
 # Torch
 import torch
@@ -305,4 +306,9 @@ class BaseCLArguments:
                                       default=False,
                                       action='store_true',
                                       help='flag for calling the fast (and lightweight) methods of calling execute')
-
+        parser_inference.add_argument(
+            "--data",
+            default='{}',
+            type=json.loads,
+            help="Darwin input data",
+        )
