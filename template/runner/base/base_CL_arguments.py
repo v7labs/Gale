@@ -308,7 +308,7 @@ class BaseCLArguments:
                                       help='flag for calling the fast (and lightweight) methods of calling execute')
         parser_inference.add_argument(
             "--data",
-            default=None,
+            default='{}',
             type=json.loads,
             help="Darwin input data",
         )
