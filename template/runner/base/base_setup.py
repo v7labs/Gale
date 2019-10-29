@@ -81,14 +81,14 @@ class BaseSetup:
                         model_name = checkpoint["model_name"]
                     elif model_name != checkpoint["model_name"]:
                         raise ValueError(f"name of the model in checkpoint does not match with --model-name. "
-                                         "{checkpoint['model_name']} != {model_name}")
+                                         f"{checkpoint['model_name']} != {model_name}")
                 # Override the number of classes based on the list of classes in
                 # the checkpoint
                 if num_classes is None:
                     num_classes = len(checkpoint["classes"])
-                elif num_classes != len(checkpoint["classes"]):
-                        raise ValueError(f"number of classes in checkpoint does not match with --num-classes. "
-                                         "{len(checkpoint['classes'])} != {num_classes}")
+                elif not isinstance(checkpoint["classes"], dict) and num_classes != len(checkpoint["classes"]):
+                    raise ValueError(f"number of classes in checkpoint does not match with --num-classes. "
+                                     f"{len(checkpoint['classes'])} != {num_classes}")
 
                 if "state_dict" in checkpoint:
                     state_dict = checkpoint["state_dict"]
