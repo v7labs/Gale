@@ -38,7 +38,7 @@ class BaseSetup:
     ################################################################################################
     # General setup: model, optimizer, lr scheduler and criterion
     @classmethod
-    def setup_model(cls, model_name, no_cuda, num_classes=None, load_model=None, strict=False, **kwargs):
+    def setup_model(cls, model_name, no_cuda, num_classes=None, load_model=None, **kwargs):
         """Setup the model, load and move to GPU if necessary
 
         Parameters
@@ -51,8 +51,6 @@ class BaseSetup:
             How many different classes there are in our problem. Used for loading the model.
         load_model : string
             Path to a saved model
-        strict : bool
-            Enforces key match between loaded state_dict and model definition
 
         Returns
         -------
@@ -111,10 +109,13 @@ class BaseSetup:
         args["num_classes"] = num_classes
         model = models.__dict__[model_name](**args)
 
-        # Load saved model weights
-        if load_model:
+        # Check for module.* name space
+        is_module_named = np.any([k.startswith('module') for k in state_dict.keys() if k])
+
+        # Load saved model weights without module naming
+        if load_model and not is_module_named:
             try:
-                model.load_state_dict(state_dict, strict=strict)
+                model.load_state_dict(state_dict)
             except Exception as exp:
                 logging.warning(exp)
 
@@ -123,6 +124,12 @@ class BaseSetup:
             logging.info('Transfer model to GPU')
             model = torch.nn.DataParallel(model).cuda()
             cudnn.benchmark = True
+            # Load saved model weights with module naming
+            if load_model and is_module_named:
+                try:
+                    model.load_state_dict(state_dict)
+                except Exception as exp:
+                    logging.warning(exp)
 
         return model
 
