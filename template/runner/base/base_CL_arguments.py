@@ -137,6 +137,10 @@ class BaseCLArguments:
                                    default=None,
                                    help='type of the split txt file to choose',
                                    required=False)
+        parser_darwin.add_argument("--data",
+                                   default='{}',
+                                   type=json.loads,
+                                   help="Darwin input data. Used at inference time.", )
 
     def _system_options(self):
         """ System options """
@@ -306,9 +310,4 @@ class BaseCLArguments:
                                       default=False,
                                       action='store_true',
                                       help='flag for calling the fast (and lightweight) methods of calling execute')
-        parser_inference.add_argument(
-            "--data",
-            default='{}',
-            type=json.loads,
-            help="Darwin input data",
-        )
+

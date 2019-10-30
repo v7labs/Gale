@@ -5,10 +5,10 @@ There are a lot of parameter which can be specified to modify the behaviour and 
 instead of hard-coding stuff.
 """
 # Utils
-import logging
-import os
 import base64
 import io
+import logging
+import os
 
 # Delegated
 import torch
@@ -46,18 +46,34 @@ class BaseInference(AbstractRunner):
         # Load the model if it does not exist yet
         if not hasattr(self, 'model') or not hasattr(self, 'transform'):
             self.model = self.setup.setup_model(**kwargs)
+            self.model.eval()
             checkpoint = self._load_checkpoint(**kwargs)
             self.transform = checkpoint['test_transform']
             self.classes = checkpoint['classes']
 
-        if not pre_load:
-            # Load and preprocess the data
-            img = self.preprocess(**kwargs)
+        if pre_load:
+            # Check no images to process are given
+            assert kwargs['input_image'] is None
+            assert kwargs['input_folder'] is None
+            # Create a fake empty image to process
+            buffered = io.BytesIO()
+            Image.new('RGB', (128, 128)).save(buffered, format="PNG")
+            kwargs['input_image'] = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-            # Forward Pass
+        # Load and preprocess the data
+        img = self.preprocess(**kwargs)
+
+        # Forward Pass
+        with torch.no_grad():
             output = self.model(img)
 
-            # Return postprocessed output
+        if pre_load:
+            # Return a standard answer
+            payload = {'result': "successfully loaded the model"}
+            logging.info(f"Returning payload: {payload}")
+            return payload
+        else:
+            # Return post-processed output
             return self.postprocess(output, **kwargs)
 
     ####################################################################################################################
@@ -113,7 +129,7 @@ class BaseInference(AbstractRunner):
     def _load_image(self, input_folder):
         """Load the image from the file system"""
         if not os.path.exists(input_folder):
-            raise FileNotFoundError("Could not find file {input_folder}")
+            raise FileNotFoundError(f"Could not find file {input_folder}")
         img = pil_loader(input_folder)
         return img
 
