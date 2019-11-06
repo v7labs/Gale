@@ -17,7 +17,7 @@ from PIL import Image
 from template.runner.base import AbstractRunner
 from template.runner.base.base_routine import BaseRoutine
 from template.runner.base.base_setup import BaseSetup
-from util.misc import pil_loader
+from util.misc import pil_loader, convert_to_rgb
 
 
 class BaseInference(AbstractRunner):
@@ -117,6 +117,7 @@ class BaseInference(AbstractRunner):
         if input_image is not None:
             assert input_folder is None
             img = Image.open(io.BytesIO(base64.decodebytes(input_image.encode("utf-8"))))
+            img = convert_to_rgb(img)
 
         # Transform it
         img = self.transform(img)

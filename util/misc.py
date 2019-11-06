@@ -81,8 +81,14 @@ def make_folder_if_not_exists(path):
         os.makedirs(path)
 
 
-def pil_loader(path):
+def pil_loader(path, to_rgb=True):
     pic = Image.open(path)
+    if to_rgb:
+        pic = convert_to_rgb(pic)
+    return pic
+
+
+def convert_to_rgb(pic):
     if pic.mode == "RGB":
         pass
     elif pic.mode in ("CMYK", "RGBA", "P"):
