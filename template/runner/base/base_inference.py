@@ -17,6 +17,7 @@ from PIL import Image
 from template.runner.base import AbstractRunner
 from template.runner.base.base_routine import BaseRoutine
 from template.runner.base.base_setup import BaseSetup
+import util.transforms as T
 from util.misc import pil_loader, convert_to_rgb
 
 
@@ -48,7 +49,12 @@ class BaseInference(AbstractRunner):
             self.model = self.setup.setup_model(**kwargs)
             self.model.eval()
             checkpoint = self._load_checkpoint(**kwargs)
-            self.transform = checkpoint['test_transform']
+            if 'test_transform' in checkpoint:
+                self.transform = checkpoint['test_transform']
+            else:
+                logging.info("Test transform not found in checkpoint. Using ToTensor().")
+                self.transform = T.Compose([T.ToTensor()])
+
             self.classes = checkpoint['classes']
 
         if pre_load:
