@@ -108,28 +108,30 @@ class BaseSetup:
                 args.update({p: kwargs[p]})
         args["num_classes"] = num_classes
         model = models.__dict__[model_name](**args)
-
+        
         # Check for module.* name space
-        is_module_named = np.any([k.startswith('module') for k in state_dict.keys() if k])
-
-        # Load saved model weights without module naming
-        if load_model and not is_module_named:
-            try:
-                model.load_state_dict(state_dict)
-            except Exception as exp:
-                logging.warning(exp)
+        if load_model:
+            # When its trained on GPU modules will have 'module' in their name
+            is_module_named = np.any([k.startswith('module') for k in state_dict.keys() if k])
+            # Load saved model weights without module naming
+            if not is_module_named:
+                try:
+                    model.load_state_dict(state_dict)
+                except Exception as exp:
+                    logging.warning(exp)
 
         # Transfer model to GPU
         if not no_cuda:
             logging.info('Transfer model to GPU')
             model = torch.nn.DataParallel(model).cuda()
             cudnn.benchmark = True
-            # Load saved model weights with module naming
-            if load_model and is_module_named:
-                try:
-                    model.load_state_dict(state_dict)
-                except Exception as exp:
-                    logging.warning(exp)
+
+        # Load saved model weights with module naming
+        if load_model and is_module_named:
+            try:
+                model.load_state_dict(state_dict)
+            except Exception as exp:
+                logging.warning(exp)
 
         return model
 
