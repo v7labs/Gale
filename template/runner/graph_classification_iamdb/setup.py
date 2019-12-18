@@ -1,28 +1,131 @@
 # Utils
-import glob
 import logging
 import os
-import sys
-
+import inspect
 import numpy as np
 import pandas as pd
+
+# torch
 import torchvision
-import yaml
-from torchvision.transforms import transforms
-import json
-from sklearn.model_selection import train_test_split
+import torch_geometric
+import torch.backends.cudnn as cudnn
+import torch
 
 # Gale
-from datasets.generic_image_folder_dataset import ImageFolderDataset
 from datasets.util.dataset_analytics import compute_mean_std_graphs, get_class_weights_graphs
 from template.runner.base.base_setup import BaseSetup
 from datasets.iamdb_gxl_dataset import GxlDataset
+import models
 
 
 class GraphClassificationSetup(BaseSetup):
     """
     Implementation of the setup methods for Graph Neural Networks and the IAMDB datasets.
     """
+    ####################################################################################################################
+    # General setup: model, optimizer, lr scheduler and criterion
+    @classmethod
+    def setup_model(cls, model_name, no_cuda, num_classes=None, num_features=None, load_model=None, strict=True, **kwargs):
+        """Setup the model, load and move to GPU if necessary
+
+        Parameters
+        ----------
+        model_name : string
+            Name of the model
+        no_cuda : bool
+            Specify whether to use the GPU or not
+        num_classes : int
+            How many different classes there are in our problem. Used for loading the model.
+        load_model : string
+            Path to a saved model
+        stric : bool
+            Enforces key match between loaded state_dict and model definition
+
+        Returns
+        -------
+        model : DataParallel
+            The model
+        """
+        # Load saved model dictionary
+        if load_model:
+            if not os.path.isfile(load_model):
+                logging.error("No model dict found at '{}'".format(load_model))
+                raise SystemExit
+            logging.info('Loading a saved model')
+            checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage.cuda())
+            if 'model_name' in checkpoint:
+                model_name = checkpoint['model_name']
+            # Override the number of classes based on the size of the last layer in the dictionary
+            if num_classes is None or type(num_classes) == int:
+                num_classes = next(reversed(checkpoint['state_dict'].values())).shape[0]
+
+        # Initialize the model
+        logging.info('Setting up model {}'.format(model_name))
+        assert num_features > 0
+        model = models.__dict__[model_name](output_channels=num_classes, num_features=num_features, **kwargs)
+
+        # Transfer model to GPU
+        if not no_cuda:
+            logging.info('Transfer model to GPU')
+            # TODO: parallelize
+            # model = torch.nn.DataParallel(model).cuda()
+            model = model.to(torch.device('cuda:{}'.format(os.environ['CUDA_VISIBLE_DEVICES'])))
+            cudnn.benchmark = True
+
+        # Load saved model weights
+        if load_model:
+            try:
+                model.load_state_dict(checkpoint['state_dict'], strict=strict)
+            except Exception as exp:
+                logging.warning(exp)
+
+        return model
+
+    @classmethod
+    def get_criterion(cls, criterion_name, no_cuda, disable_databalancing, **kwargs):
+        """
+        This function serves as an interface between the command line and the criterion.
+
+        Parameters
+        ----------
+        criterion_name : string
+            Name of the criterion
+        no_cuda : bool
+            Specify whether to use the GPU or not
+        disable_databalancing : boolean
+            If True the criterion will not be fed with the class frequencies. Use with care.
+
+        Returns
+        -------
+        torch.nn
+            The initialized criterion
+
+        """
+        # Verify that the criterion exists
+        assert criterion_name in torch.nn.__dict__
+
+        args = {}
+        # For all arguments declared in the constructor signature of the selected optimizer
+        for p in inspect.getfullargspec(torch.nn.__dict__[criterion_name].__init__).args:
+            # Add it to a dictionary in case it exists a corresponding value in kwargs
+            if p in kwargs:
+                args.update({p: kwargs[p]})
+
+        # Instantiate the criterion
+        criterion = torch.nn.__dict__[criterion_name](**args)
+
+        if not disable_databalancing:
+            try:
+                logging.info('Loading weights for data balancing')
+                weights = cls.load_class_weights_from_file(**kwargs)
+                criterion.weight = torch.from_numpy(weights).type(torch.FloatTensor)
+            except:
+                logging.warning('Unable to load information for data balancing. Using normal criterion')
+
+        if not no_cuda:
+            # TODO parallelize
+            criterion.cuda(device=torch.device('cuda:{}'.format(os.environ['CUDA_VISIBLE_DEVICES'])))
+        return criterion
 
     ####################################################################################################################
     # Analytics handling
@@ -138,11 +241,10 @@ class GraphClassificationSetup(BaseSetup):
 
         # TODO implement this
         # verify_dataset_integrity(**kwargs)
-
-        return train_loader, val_loader, test_loader, len(train_ds.classes)
+        return train_loader, val_loader, test_loader, train_ds.num_classes, train_ds.num_features
 
     @classmethod
-    def _get_datasets(cls, input_folder, darwin_dataset, **kwargs):
+    def _get_datasets(cls, input_folder, rebuild_dataset, **kwargs):
         """
         Loads the dataset from file system and provides the dataset splits for train validation and test
 
@@ -160,47 +262,37 @@ class GraphClassificationSetup(BaseSetup):
         test_ds : data.Dataset
             Train, validation and test splits
         """
-        if darwin_dataset:
-            # Split the data into train/val/test folders
-            cls.split_darwin_dataset(input_folder=input_folder, **kwargs)
 
         if not os.path.isdir(input_folder):
             raise RuntimeError("Dataset folder not found at " + input_folder)
 
-        train_dir = os.path.join(input_folder, 'train')
-        if not os.path.isdir(train_dir):
-            raise RuntimeError("Train folder not found in the dataset_folder=" + input_folder)
-        train_ds = cls.get_split(path=train_dir, **kwargs)
+        data_dir = os.path.join(input_folder)
+        if not os.path.isdir(data_dir):
+            raise RuntimeError("Data folder not found in the dataset_folder=" + input_folder)
 
-        val_dir = os.path.join(input_folder, 'val')
-        if not os.path.isdir(val_dir):
-            raise RuntimeError("Val folder not found in the dataset_folder=" + input_folder)
-        val_ds = cls.get_split(path=val_dir, **kwargs)
+        if rebuild_dataset:
+            logging.warning('Datasets will be rebuilt!')
+        else:
+            logging.warning('Datasets will NOT be rebuilt!')
 
-        test_dir = os.path.join(input_folder, 'test')
-        if not os.path.isdir(test_dir):
-            raise RuntimeError("Test folder not found in the dataset_folder=" + input_folder)
-        test_ds = cls.get_split(path=test_dir, **kwargs)
+        train_ds = cls.get_split(root_path=data_dir, subset='train', rebuild_dataset=rebuild_dataset, **kwargs)
+        val_ds = cls.get_split(root_path=data_dir, subset='valid', rebuild_dataset=rebuild_dataset, **kwargs)
+        test_ds = cls.get_split(root_path=data_dir, subset='test', rebuild_dataset=rebuild_dataset, **kwargs)
 
         return train_ds, val_ds, test_ds
 
     @classmethod
-    def get_split(cls, split_folder, **kwargs):
+    def get_split(cls, **kwargs):
         """ Loads a split from file system and provides the dataset
-
-        Parameters
-        ----------------
-        split_folder : string
-            Path to the dataset on the file System
 
         Returns
         -------
-        data.Dataset
+        torch_geometric.data.InMemoryDataset
         """
-        raise NotImplementedError
+        return GxlDataset(**kwargs)
 
     @classmethod
-    def _dataloaders_from_datasets(cls, batch_size, train_ds, val_ds, test_ds, workers, **kwargs):
+    def _dataloaders_from_datasets(cls, batch_size, train_ds, val_ds, test_ds, **kwargs):
         """
         This function creates (and returns) dataloader from datasets objects
 
@@ -217,26 +309,19 @@ class GraphClassificationSetup(BaseSetup):
 
         Returns
         -------
-        train_loader : torch.utils.data.DataLoader
-        val_loader : torch.utils.data.DataLoader
-        test_loader : torch.utils.data.DataLoader
+        train_loader : torch_geometric.data.DataLoader
+        val_loader : torch_geometric.data.DataLoader
+        test_loader : torch_geometric.data.DataLoader
             The dataloaders for each split passed
         """
         # Setup dataloaders
         logging.debug('Setting up dataloaders')
-        train_loader = torch.utils.data.DataLoader(train_ds,
-                                                   shuffle=True,
-                                                   batch_size=batch_size,
-                                                   num_workers=workers,
-                                                   pin_memory=True)
-        val_loader = torch.utils.data.DataLoader(val_ds,
-                                                 batch_size=batch_size,
-                                                 num_workers=workers,
-                                                 pin_memory=True)
-        test_loader = torch.utils.data.DataLoader(test_ds,
-                                                  batch_size=batch_size,
-                                                  num_workers=workers,
-                                                  pin_memory=True)
+        train_loader = torch_geometric.data.DataLoader(train_ds,
+                                                       batch_size=batch_size)
+        val_loader = torch_geometric.data.DataLoader(val_ds,
+                                                     batch_size=batch_size)
+        test_loader = torch_geometric.data.DataLoader(test_ds,
+                                                      batch_size=batch_size)
         return train_loader, val_loader, test_loader
 
     ####################################################################################################################

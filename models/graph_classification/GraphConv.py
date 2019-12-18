@@ -4,12 +4,23 @@ from torch_geometric.nn import global_mean_pool, global_max_pool
 import torch
 from torch.nn import Linear, functional as F
 
+from models.registry import Model
 
-class GraphConv(torch.nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(GraphConv, self).__init__()
 
-        self.conv1 = GraphConv(in_channels, 128)
+class GraphConvTKP(torch.nn.Module):
+    def __init__(self, num_features, output_channels):
+        """
+
+        Parameters
+        ----------
+        num_features: int
+            number of node features
+        output_channels: int
+            number of classes
+        """
+        super(GraphConvTKP, self).__init__()
+
+        self.conv1 = GraphConv(num_features, 128)
         self.pool1 = TopKPooling(128, ratio=0.8)
         self.conv2 = GraphConv(128, 128)
         self.pool2 = TopKPooling(128, ratio=0.8)
@@ -18,7 +29,7 @@ class GraphConv(torch.nn.Module):
 
         self.lin1 = torch.nn.Linear(256, 128)
         self.lin2 = torch.nn.Linear(128, 64)
-        self.lin3 = torch.nn.Linear(64, out_channels)
+        self.lin3 = torch.nn.Linear(64, output_channels)
 
     def forward(self, data):
         x, edge_index, batch = data.x, data.edge_index, data.batch
@@ -42,3 +53,11 @@ class GraphConv(torch.nn.Module):
         x = F.log_softmax(self.lin3(x), dim=-1)
 
         return x
+
+@Model
+def graphconvTKP(num_features, output_channels, **kwargs):
+    """
+    Simple Graph Convolution Neural Network
+    """
+    return GraphConvTKP(num_features, output_channels)
+

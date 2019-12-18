@@ -75,7 +75,8 @@ class ParsedGxlDataset:
             'node_feature_names': self.node_feature_names,
             'edge_feature_names': self.edge_feature_names,
             'datset_split': self.dataset_split,
-            'class_encoding': self.class_int_encoding
+            'class_encoding': self.class_int_encoding,
+            'classes': self.classes
         }
         if hasattr(self, 'nodes_onehot'):
             config['one-hot_encoding_node_features'] = self.nodes_onehot
@@ -94,6 +95,7 @@ class ParsedGxlDataset:
             {'train': {'file1.gxl': 'class_label' }, ...}
         """
         filename_class_split = {}
+
         for subset in ['train', 'test', 'valid']:
             tree = ET.parse(os.path.join(self.root_path, subset + '.cxl'))
             root = tree.getroot()
@@ -224,6 +226,7 @@ class ParsedGxlDataset:
             filename_split_class[filename] = class_label
 
         self.class_int_encoding = {c: i for i, c in enumerate(sorted(set([i for i in filename_split_class.values()])))}
+        self.classes = [c for c in sorted(set([i for i in filename_split_class.values()]))]
 
         graphs = []
         for filename in self.all_file_names:

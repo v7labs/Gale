@@ -2,26 +2,29 @@ import os
 import numpy as np
 import torch
 import shutil
+import json
+import logging
 
 from torch_geometric.data import InMemoryDataset, Data
 from datasets.util.gxl_parser import ParsedGxlDataset
 
 
 class GxlDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None, categorical_features=None, rebuild_dataset=True,
-                 subset='', use_position=False, features_to_use=None, **kwargs):
+    def __init__(self, root_path, transform=None, pre_transform=None, categorical_features=None, rebuild_dataset=True,
+                 subset='', use_position=True, features_to_use=None, **kwargs):
         """
         This class reads a IAM dataset in gxl format (tested for AIDS, Fingerprint, Letter)
 
         Parameters
         ----------
         use_position
-        root: str
-            Path to the dataset folder. There has to be a subfolder 'data' where the graph gxl files and the train.cxl,
+        root_path: str
+            Path to the dataset folder. There has to be a sub-folder 'data' where the graph gxl files and the train.cxl,
             valid.cxl and test.cxl files are.
         transform:
         pre_transform:
-        categorical_features : dict
+        categorical_features : str
+            path to json file
             optional parameter: dictionary with first level 'edge' and/or 'node' and then a list of the attribute names
             that need to be one-hot encoded ( = are categorical)
             e.g. {'node': ['symbol'], 'edge': ['valence']}}
@@ -29,12 +32,15 @@ class GxlDataset(InMemoryDataset):
             True if dataset should be re-processed
         subset: str
             'valid', 'train' or 'test (or empty) --> name has to match the corresponding cxl file
-        features_to_use: list
-            list of the attribute names (either node or edges) that should be used
-            e.g. ['symbol', 'valence']
+        features_to_use: string
+            comma delimited list of the attribute names (either node or edges) that should be used
+            e.g. "symbol,valence"
 
         """
-        self.root = root
+        self.transform = None
+        self.target_transform = None
+
+        self.root = root_path
         self.subset = subset
         self.use_position = use_position
         # should we load the saved dataset from processed or should it be rebuilt
@@ -45,9 +51,14 @@ class GxlDataset(InMemoryDataset):
 
         # initiate the two dictionaries
         self.categorical_features = self._setup_cat_feature_dict(categorical_features)
-        self.features_to_use = features_to_use
+        if features_to_use is not None:
+            assert type(features_to_use) == str
+            self.features_to_use = [item for item in features_to_use.split(',')]
+        else:
+            self.features_to_use = features_to_use
 
-        self.name = os.path.basename(root)
+
+        self.name = os.path.basename(root_path)
 
         super(GxlDataset, self).__init__(self.root, transform, pre_transform)
 
@@ -114,10 +125,15 @@ class GxlDataset(InMemoryDataset):
         torch.save((data, slices, config), os.path.join(self.processed_paths[0]))
 
     @staticmethod
-    def _setup_cat_feature_dict(dict):
-        if dict is None:
+    def _setup_cat_feature_dict(json_path):
+        if json_path is None:
             dict = {'node': [], 'edge': []}
         else:
+            # read the json file
+            logging.info('Loading categorical variables from JSON ({})'.format(json_path))
+            with open('strings.json') as f:
+                dict = json.load(json_path)
+            # add missing keys
             if 'edge' not in dict:
                 dict['edge'] = []
             if 'node' not in dict:

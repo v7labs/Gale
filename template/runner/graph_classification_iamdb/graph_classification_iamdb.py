@@ -1,6 +1,5 @@
+import os
 import logging
-import models
-import sys
 
 # Gale
 from template.runner.base import BaseRunner
@@ -21,6 +20,15 @@ class GraphClassificationIamdb(BaseRunner):
             (strategy design pattern) Object responsible for setup operations
         """
         super().__init__()
+
+        # ensure that only one GPU is used
+        # TODO parallelize
+        cuda_devices = os.environ['CUDA_VISIBLE_DEVICES']
+        if len(cuda_devices) > 1:
+            ind = cuda_devices[0]
+            logging.warning("This runner can only be used on one GPU at a time, selecting GPU {}".format(ind))
+            os.environ['CUDA_VISIBLE_DEVICES'] = ind
+
         self.setup = GraphClassificationSetup()
 
     def prepare(self, model_name, resume, batch_lrscheduler_name, epoch_lrscheduler_name, **kwargs) -> dict:
@@ -73,10 +81,11 @@ class GraphClassificationIamdb(BaseRunner):
         # logging.info('Model {} expects input size of {}'.format(model_name, model_expected_input_size))
 
         # Setting up the dataloaders
-        train_loader, val_loader, test_loader, num_classes = self.setup.set_up_dataloaders(**kwargs)
+        train_loader, val_loader, test_loader, num_classes, num_features = self.setup.set_up_dataloaders(**kwargs)
 
         # Setting up model, optimizer, criterion
-        model = self.setup.setup_model(model_name=model_name, num_classes=num_classes, train_loader=train_loader, **kwargs)
+        model = self.setup.setup_model(model_name=model_name, num_classes=num_classes, train_loader=train_loader,
+                                       num_features=num_features, **kwargs)
         optimizer = self.setup.get_optimizer(model=model, **kwargs)
         criterion = self.setup.get_criterion(**kwargs)
 
@@ -104,6 +113,7 @@ class GraphClassificationIamdb(BaseRunner):
         return {
             "model": model,
             "num_classes": num_classes,
+            "num_features": num_features,
             "best_value": best_value,
             "train_loader": train_loader,
             "val_loader": val_loader,

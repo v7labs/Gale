@@ -1,11 +1,12 @@
-# DeepDIVA
-import warnings
+import torch
 
+# Gale
 import numpy as np
 from evaluation.metrics import accuracy
 from util.metric_logger import MetricLogger
 from util.TB_writer import TBWriter
 from .train import GraphClassificationTrain
+
 
 class GraphClassificationEvaluate(GraphClassificationTrain):
 
@@ -32,9 +33,6 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
         # Compute output
         output = model(input)
 
-        # Unpack the target
-        target = target['class']
-
         # Compute and record the loss
         loss = criterion(output, target)
         MetricLogger().update(key='loss', value=loss.item(), n=len(input))
@@ -60,12 +58,14 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
             Label for logging purposes. Typically 'train', 'test' or 'valid'.
             It's prepended to the logging output path and messages.
         """
+        classes = data_loader.dataset.config['classes']
+
         # Make and log to TB the confusion matrix
-        cm = MetricLogger()['confusion_matrix'].make_heatmap(data_loader.dataset.classes)
+        cm = MetricLogger()['confusion_matrix'].make_heatmap(classes)
         TBWriter().save_image(tag=logging_label + '/confusion_matrix', image=cm, global_step=epoch)
 
         # Generate a classification report for each epoch
-        cr = MetricLogger()['confusion_matrix'].get_classification_report(data_loader.dataset.classes)
+        cr = MetricLogger()['confusion_matrix'].get_classification_report(classes)
         TBWriter().add_text(tag='Classification Report for epoch {}\n'.format(epoch),
                             text_string='\n' + cr,
                             global_step=epoch)
