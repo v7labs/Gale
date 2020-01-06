@@ -348,7 +348,7 @@ def get_class_weights_graphs(dataset, **kwargs):
     """
     logging.info('Begin computing class frequencies weights')
 
-    class_frequencies = np.array(dataset.config['class_freq'])
+    class_frequencies = np.array(dataset.config['class_freq'][1])
     # Class weights are the inverse of the class frequencies
     class_weights = 1 / class_frequencies
     # Normalize vector to sum up to 1.0 (in case the Loss function does not do it)

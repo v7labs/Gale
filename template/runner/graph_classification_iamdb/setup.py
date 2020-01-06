@@ -61,7 +61,6 @@ class GraphClassificationSetup(BaseSetup):
 
         # Initialize the model
         logging.info('Setting up model {}'.format(model_name))
-        assert num_features > 0
         model = models.__dict__[model_name](output_channels=num_classes, num_features=num_features, **kwargs)
 
         # Transfer model to GPU
@@ -172,6 +171,19 @@ class GraphClassificationSetup(BaseSetup):
         df.to_csv(os.path.join(input_folder, 'analytics.csv'), header=False)
 
     @classmethod
+    def load_class_weights_from_file(cls, **kwargs):
+        """ Recover class weights from the analytics.csv file
+
+        Returns
+        -------
+        ndarray[double]
+            Class weights of the selected dataset, contained in the analytics.csv file.
+        """
+        # Loads the analytics csv and extract mean and std
+        csv_file = cls._load_analytics_csv(**kwargs)
+        return csv_file[csv_file[0] == 'class_weights[num_classes]'].values.tolist()[0][1:]
+
+    @classmethod
     def load_mean_std_from_file(cls, **kwargs):
         """ Recover mean and std from the analytics.csv file
 
@@ -225,12 +237,16 @@ class GraphClassificationSetup(BaseSetup):
             kwargs['input_folder'])
         )
 
+        # Loads the analytics csv and extract mean and std
+        mean_std = cls.load_mean_std_from_file(**kwargs)
+
         # Load the datasets
-        train_ds, val_ds, test_ds = cls._get_datasets(**kwargs)
+        train_ds, val_ds, test_ds = cls._get_datasets(mean_std=mean_std, **kwargs)
 
         # Setup transforms
-        logging.info('Setting up transforms')
-        cls.set_up_transforms(train_ds=train_ds, val_ds=val_ds, test_ds=test_ds, **kwargs)
+        # TODO implement this?
+#        logging.info('Setting up transforms')
+#        cls.set_up_transforms(train_ds=train_ds, val_ds=val_ds, test_ds=test_ds, **kwargs)
 
         # Get the dataloaders
         train_loader, val_loader, test_loader = cls._dataloaders_from_datasets(train_ds=train_ds,

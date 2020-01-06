@@ -7,7 +7,7 @@ from datasets.util.custom_exception import InvalidFileException
 
 
 class ParsedGxlDataset:
-    def __init__(self, path_to_dataset, categorical_features=None, subset="", use_position=False, features_to_use=None):
+    def __init__(self, path_to_dataset, categorical_features=None, subset="", use_position=False, features_to_use=None, no_empty_graphs=False):
         """
         This class creates a dataset object containing all the graphs parsed from gxl files as ParsedGxlGraph objects
 
@@ -20,6 +20,7 @@ class ParsedGxlDataset:
             name of the attribute and a dict of its respective one-hot encoding
             e.g. {'node': {'symbol': {'C': [1, 0, 0], 'H': [0, 1, 0], 'O: [0, 0, 1]}}}
         """
+        self.no_empty_graphs = no_empty_graphs
         self.subset = subset
         self.use_position = use_position
         self.features_to_use = features_to_use
@@ -44,14 +45,20 @@ class ParsedGxlDataset:
             self.graphs = self.get_graphs()
 
         # get the node and edge feature names available at a higher level
-        self.node_feature_names = self.graphs[0].node_feature_names
-        self.edge_feature_names = self.graphs[0].edge_feature_names
+        agraph = [g for g in self.graphs if len(g.node_features) > 0][0]
+        self.node_feature_names = agraph.node_feature_names
+        self.edge_feature_names = agraph.edge_feature_names
 
         # node / edge feature names and data type
-        self.node_dtypes = [type(dtype) for dtype in self.graphs[0].node_features[0]]
-        assert len(self.node_feature_names) == len(self.node_dtypes)
+        if len(agraph.node_features) > 0:
+            self.node_dtypes = [type(dtype) for dtype in agraph.node_features[0]]
+        else:
+            self.node_dtypes = None
 
-        self.edge_dtypes = [type(dtype) for dtype in self.graphs[0].edge_features[0]] if self.edge_feature_names else None
+        if self.node_feature_names is not None and self.node_dtypes is not None:
+            assert len(self.node_feature_names) == len(self.node_dtypes)
+
+        self.edge_dtypes = [type(dtype) for dtype in agraph.edge_features[0]] if self.edge_feature_names else None
         if self.edge_dtypes:
             assert len(self.edge_feature_names) == len(self.edge_dtypes)
 
@@ -68,7 +75,6 @@ class ParsedGxlDataset:
         return len(self.graphs)
 
     def config(self):
-        # make a dict of the configurations, that can be saved
         config = {
             'dataset_name': self.name,
             'categorical_features': self.categorical_features,
@@ -195,6 +201,7 @@ class ParsedGxlDataset:
                 filename_split_class[filename] = (subset, class_label)
 
         self.class_int_encoding = {c: i for i, c in enumerate(sorted(set([i[1] for i in filename_split_class.values()])))}
+        self.classes = [c for c in sorted(set([i for i in filename_split_class.values()]))]
 
         graphs = []
         for filename in self.all_file_names:
@@ -205,10 +212,10 @@ class ParsedGxlDataset:
                     print('{} does not appear in the dataset split files'.format(filename))
 
                 g = ParsedGxlGraph(os.path.join(self.root_path, filename), subset, self.class_int_encoding[class_label],
-                                   use_position=self.use_position, features_to_use=self.features_to_use)
+                                   use_position=self.use_position, features_to_use=self.features_to_use, no_empty_graphs=self.no_empty_graphs)
                 graphs.append(g)
             except InvalidFileException:
-                print('File {} is invalid. Please verify that the file contains the expected attributes (node, edge, id, edgeids and edgemode)'.format(filename))
+                print('File {} is invalid. Please verify that the file contains the expected attributes (id, edgeids, edgemode and nodes and edges, if expected)'.format(filename))
                 self.invalid_files.append(filename)
 
         return graphs
@@ -276,7 +283,7 @@ class ParsedGxlDataset:
 
 
 class ParsedGxlGraph:
-    def __init__(self, path_to_gxl, subset, class_label, use_position=False, features_to_use=None):
+    def __init__(self, path_to_gxl, subset, class_label, use_position=True, features_to_use=None, no_empty_graphs=False):
         """
         This class contains all the information encoded in a single gxl file = one graph
         Parameters
@@ -289,6 +296,8 @@ class ParsedGxlGraph:
             path to the gxl file
         """
         assert os.path.isfile(path_to_gxl)
+        self.no_empty_graphs = no_empty_graphs
+
         self.features_to_use = features_to_use
         self.use_position = use_position
         # path to the gxl file
@@ -320,13 +329,13 @@ class ParsedGxlGraph:
         root = tree.getroot()
 
         # verify that the file contains the expected attributes (node, edge, id, edgeids and edgemode)
-        self.verification(root)
+        self.verification(root, self.no_empty_graphs)
 
         edges = self.get_edges(root)
         node_feature_names, node_features = self.get_features(root, 'node')
 
         # remove the x and y node features and put them in their own variable
-        if 'x' in node_feature_names and 'y' in node_feature_names:
+        if node_feature_names is not None and 'x' in node_feature_names and 'y' in node_feature_names:
             x_ind = node_feature_names.index('x')
             y_ind = node_feature_names.index('y')
             node_position = [[node[x_ind], node[y_ind]] for node in node_features]
@@ -338,7 +347,7 @@ class ParsedGxlGraph:
                 del node_feature_names[x_ind]
                 del node_feature_names[y_ind-1]
         else:
-            node_position = None
+            node_position = []
 
         edge_feature_names, edge_features = self.get_features(root, 'edge')
 
@@ -360,7 +369,12 @@ class ParsedGxlGraph:
             list of all node features for that tree
             ([[feature 1 of node 1, feature 2 of node 1, ...], [feature 1 of node 2, ...], ...])
         """
-        feature_names = [i.attrib['name'] for i in [[feature for feature in node] for node in root.iter(mode)][0]]
+        features_info = [[feature for feature in node] for node in root.iter(mode)]
+        if len(features_info) > 0:
+            feature_names = [i.attrib['name'] for i in features_info[0]]
+        else:
+            feature_names = []
+
         # only use the ones specified, if necessary
         if self.features_to_use is not None:
             feature_names = [name for name in feature_names if name in self.features_to_use]
@@ -378,12 +392,14 @@ class ParsedGxlGraph:
             #                 node_features.append(self.decode_feature(value))
             #     features.append(node_features)
         else:
-            features = feature_names = None
+            feature_names = None
+            features = []
 
         return feature_names, features
 
+
     @staticmethod
-    def verification(root):
+    def verification(root, no_empty_graphs):
         """
         Check if files contain the expected content
 
@@ -396,12 +412,18 @@ class ParsedGxlGraph:
         None
         """
         # check if node, edge, edgeid, edgemode, edgemode keyword exists
-        if len([edge for edge in root.iter('edge')]) == 0:
-            raise InvalidFileException
-        if len([node for node in root.iter('node')]) == 0:
-            raise InvalidFileException
         if len([i.attrib for i in root.iter('graph')][0]) != 3:
             raise InvalidFileException
+
+        num_edges = len([edge for edge in root.iter('edge')])
+        num_nodes = len([node for node in root.iter('node')])
+
+        if no_empty_graphs:
+            print('Excluding empty graphs')
+            if len([edge for edge in root.iter('edge')]) == 0:
+                raise InvalidFileException
+            if len([node for node in root.iter('node')]) == 0:
+                raise InvalidFileException
 
     @staticmethod
     def get_graph_attr(root):
@@ -435,17 +457,20 @@ class ParsedGxlGraph:
         [[int, int]]
             list of indices of connected nodes
         """
+        edge_list = []
+
         start_points = [int(edge.attrib["from"].replace('_', '')) for edge in root.iter('edge')]
         end_points = [int(edge.attrib["to"].replace('_', '')) for edge in root.iter('edge')]
         assert len(start_points) == len(end_points)
 
         # move enumeration start to 0
-        if min(min(start_points, end_points)) > 0:
-            shift = min(min(start_points, end_points))
-            start_points = [x - shift for x in start_points]
-            end_points = [x - shift for x in end_points]
+        if len(start_points) > 0 and len(end_points) > 0:
+            if min(min(start_points, end_points)) > 0:
+                shift = min(min(start_points, end_points))
+                start_points = [x - shift for x in start_points]
+                end_points = [x - shift for x in end_points]
 
-        edge_list = [[start_points[i], end_points[i]] for i in range(len(start_points))]
+            edge_list = [[start_points[i], end_points[i]] for i in range(len(start_points))]
 
         return edge_list
 
@@ -458,3 +483,43 @@ class ParsedGxlGraph:
         # convert the feature value to the correct data type as specified in the gxl
         return data_types[f.tag](f.text.strip())
 
+
+def normalize_graph(graph, mean_std):
+    """
+    This method normalizes the node and edge features (if present) and initializes a random node for empty graphs
+
+    Parameters
+    ----------
+    graph: ParsedGxlGraph
+
+    mean_std: dict
+        dictionary containing the mean and standard deviation for the node and edge features
+
+    Returns
+    ----------
+    Normalized graph
+
+    """
+    def z_normalize(feature, mean, std):
+
+        return (feature - mean) / std
+
+    node_mean = mean_std['node_features']['mean']
+    node_std = mean_std['node_features']['std']
+    edge_mean = mean_std['edge_features']['mean']
+    edge_std = mean_std['edge_features']['std']
+
+
+    # normalize the node features, if none are present initialize a random node
+    if len(graph.node_features) > 0:
+        for node_ind in range(len(graph.node_features)):
+            graph.node_features[node_ind] = [z_normalize(graph.node_features[node_ind][i], node_mean[i], node_std[i])
+                                             for i in range(len(node_mean))]
+    else:
+        graph.node_features = [np.random.normal(node_mean, node_std, len(node_mean))]
+    # normalize the edge features
+    for edge_ind in range(len(graph.edge_features)):
+        graph.edge_features[edge_ind] = [z_normalize(graph.edge_features[edge_ind][i], edge_mean[i], edge_std[i])
+                                         for i in range(len(edge_mean))]
+
+    return graph

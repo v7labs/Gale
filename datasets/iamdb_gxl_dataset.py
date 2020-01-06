@@ -6,12 +6,12 @@ import json
 import logging
 
 from torch_geometric.data import InMemoryDataset, Data
-from datasets.util.gxl_parser import ParsedGxlDataset
+from datasets.util.gxl_parser import ParsedGxlDataset, normalize_graph
 
 
 class GxlDataset(InMemoryDataset):
     def __init__(self, root_path, transform=None, pre_transform=None, categorical_features=None, rebuild_dataset=True,
-                 subset='', use_position=True, features_to_use=None, **kwargs):
+                 subset='', use_position=True, features_to_use=None, no_empty_graphs=False, mean_std=None, **kwargs):
         """
         This class reads a IAM dataset in gxl format (tested for AIDS, Fingerprint, Letter)
 
@@ -35,11 +35,16 @@ class GxlDataset(InMemoryDataset):
         features_to_use: string
             comma delimited list of the attribute names (either node or edges) that should be used
             e.g. "symbol,valence"
+        mean_std: dict (optional)
+            default None. Dictionary containing the mean and std of the node and edge features. If not none, the normalzation
+            will be performed and empty graphs will be initialized with a random value.
 
         """
         self.transform = None
         self.target_transform = None
+        self.mean_std = mean_std
 
+        self.no_empty_graphs = no_empty_graphs
         self.root = root_path
         self.subset = subset
         self.use_position = use_position
@@ -56,7 +61,6 @@ class GxlDataset(InMemoryDataset):
             self.features_to_use = [item for item in features_to_use.split(',')]
         else:
             self.features_to_use = features_to_use
-
 
         self.name = os.path.basename(root_path)
 
@@ -93,23 +97,28 @@ class GxlDataset(InMemoryDataset):
         Processes the dataset to the :obj:`self.processed_dir` folder.
         """
         gxl_dataset = ParsedGxlDataset(os.path.join(self.root, 'data'), self.categorical_features, subset=self.subset,
-                                       use_position=self.use_position, features_to_use=self.features_to_use)
+                                       use_position=self.use_position, features_to_use=self.features_to_use,
+                                       no_empty_graphs=self.no_empty_graphs)
 
         config = gxl_dataset.config
         data_list = []
 
         # create the dataset lists: transform the graphs in the GxlDataset into pytorch geometric Data objects
         for graph in gxl_dataset.graphs:
-            # x (Tensor, optional): Node feature matrix with shape :obj:`[num_nodes, num_node_features]`
-            # y (Tensor, optional): Graph or node targets with arbitrary shape.
-            # edge_index (LongTensor, optional): Graph connectivity in COO format with shape :obj:`[2, num_edges]`
-            # edge_attr (Tensor, optional): Edge feature matrix with shape :obj:`[num_edges, num_edge_features]`
-            # y (Tensor, optional): Graph or node targets with arbitrary shape
-            x = torch.tensor(graph.node_features, dtype=torch.float) if graph.node_features is not None else None
+            # x (Tensor): Node feature matrix with shape :obj:`[num_nodes, num_node_features]`
+            # y (Tensor): Graph or node targets with arbitrary shape.
+            # edge_index (LongTensor): Graph connectivity in COO format with shape :obj:`[2, num_edges]`
+            # edge_attr (Tensor): Edge feature matrix with shape :obj:`[num_edges, num_edge_features]`
+            # y (Tensor): Graph or node targets with arbitrary shape
+
+            if self.mean_std is not None:
+                graph = normalize_graph(graph, self.mean_std)
+
+            x = torch.tensor(graph.node_features, dtype=torch.float)
             edge_index = torch.tensor(graph.edges, dtype=torch.long).t().contiguous()
-            edge_attr = torch.tensor(graph.edge_features, dtype=torch.float) if graph.edge_features is not None else None
-            pos = torch.tensor(graph.node_position, dtype=torch.float) if graph.node_position is not None else None
-            y = graph.class_label if graph.class_label is not None else None
+            edge_attr = torch.tensor(graph.edge_features, dtype=torch.float)
+            pos = torch.tensor(graph.node_position, dtype=torch.float)
+            y = graph.class_label
             g = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, y=y)
 
             data_list.append(g)

@@ -30,8 +30,12 @@ class GraphClassificationIamdbCLArguments(BaseCLArguments):
         parser_graph_neural_network.add_argument('--use-position',
                                                  default=False,
                                                  action='store_true',
-                                                 help='Set to True if node positions should not be used as a feature')
+                                                 help='Set if node positions should be used as a feature')
         parser_graph_neural_network.add_argument('--features-to-use',
                                                  type=str,
+                                                 help='Specify features that should be used like "NodeFeatureName1,NodeFeatureName2,EdgefeatureName1"')
+        parser_graph_neural_network.add_argument('--no-empty-graphs',
+                                                 default=False,
+                                                 action='store_true',
                                                  help='Specify features that should be used like "NodeFeatureName1,NodeFeatureName2,EdgefeatureName1"')
 
