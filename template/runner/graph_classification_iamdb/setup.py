@@ -52,7 +52,7 @@ class GraphClassificationSetup(BaseSetup):
                 logging.error("No model dict found at '{}'".format(load_model))
                 raise SystemExit
             logging.info('Loading a saved model')
-            checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage.cuda())
+            checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage.cuda(int(os.environ['CUDA_VISIBLE_DEVICES'])))
             if 'model_name' in checkpoint:
                 model_name = checkpoint['model_name']
             # Override the number of classes based on the size of the last layer in the dictionary
@@ -160,9 +160,10 @@ class GraphClassificationSetup(BaseSetup):
         edgef_names = train_dataset.config['edge_feature_names']
 
         # Save results as CSV file in the dataset folder
-        df = pd.DataFrame([nodef_names, mean_std_nodef['mean'], mean_std_nodef['std'],
+        df = [nodef_names, mean_std_nodef['mean'], mean_std_nodef['std'],
                            edgef_names, mean_std_edgef['mean'], mean_std_edgef['std'],
-                           class_weights])
+                           class_weights]
+        df = pd.DataFrame([x if x is not None else [] for x in df])
 
         df.index = ['node features', 'mean[node feature]', 'std[node feature]',
                     'edge features', 'mean[edge feature]', 'std[edge feature]',
@@ -181,7 +182,8 @@ class GraphClassificationSetup(BaseSetup):
         """
         # Loads the analytics csv and extract mean and std
         csv_file = cls._load_analytics_csv(**kwargs)
-        return csv_file[csv_file[0] == 'class_weights[num_classes]'].values.tolist()[0][1:]
+        weights = csv_file[csv_file[0] == 'class_weights[num_classes]'].values.tolist()[0][1:]
+        return np.array([x for x in weights if str(x) != 'nan'], dtype=float)
 
     @classmethod
     def load_mean_std_from_file(cls, **kwargs):

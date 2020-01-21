@@ -201,6 +201,7 @@ class BaseSetup:
 
     ####################################################################################################################
     # Analytics handling
+
     @classmethod
     def _load_analytics_csv(cls, input_folder, **kwargs):
         """ Load the analytics.csv file. If it is missing, attempt creating it

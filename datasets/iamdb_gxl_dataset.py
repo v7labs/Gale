@@ -4,6 +4,7 @@ import torch
 import shutil
 import json
 import logging
+import pandas as pd
 
 from torch_geometric.data import InMemoryDataset, Data
 from datasets.util.gxl_parser import ParsedGxlDataset, normalize_graph
@@ -11,7 +12,8 @@ from datasets.util.gxl_parser import ParsedGxlDataset, normalize_graph
 
 class GxlDataset(InMemoryDataset):
     def __init__(self, root_path, transform=None, pre_transform=None, categorical_features=None, rebuild_dataset=True,
-                 subset='', use_position=True, features_to_use=None, no_empty_graphs=False, mean_std=None, **kwargs):
+                 subset='', disable_position=False, features_to_use=None, no_empty_graphs=False, mean_std=None,
+                 disable_feature_norm=False, **kwargs):
         """
         This class reads a IAM dataset in gxl format (tested for AIDS, Fingerprint, Letter)
 
@@ -47,7 +49,8 @@ class GxlDataset(InMemoryDataset):
         self.no_empty_graphs = no_empty_graphs
         self.root = root_path
         self.subset = subset
-        self.use_position = use_position
+        self.use_position = disable_position
+        self.disable_feature_norm = disable_feature_norm
         # should we load the saved dataset from processed or should it be rebuilt
         processed_path = os.path.join(self.root, 'processed')
         if rebuild_dataset and os.path.exists(processed_path):
@@ -97,13 +100,18 @@ class GxlDataset(InMemoryDataset):
         Processes the dataset to the :obj:`self.processed_dir` folder.
         """
         gxl_dataset = ParsedGxlDataset(os.path.join(self.root, 'data'), self.categorical_features, subset=self.subset,
-                                       use_position=self.use_position, features_to_use=self.features_to_use,
+                                       disable_position=self.use_position, features_to_use=self.features_to_use,
                                        no_empty_graphs=self.no_empty_graphs)
 
         config = gxl_dataset.config
         data_list = []
 
         # create the dataset lists: transform the graphs in the GxlDataset into pytorch geometric Data objects
+        file_names = gxl_dataset.file_names
+        # save the file_names list
+        if not os.path.isfile(os.path.join(os.path.dirname(self.processed_paths[0]), 'file_name_list.csv')):
+            pd.DataFrame({'file_names': file_names}).to_csv(os.path.join(os.path.dirname(self.processed_paths[0]), 'file_name_list.csv'), index=False)
+
         for graph in gxl_dataset.graphs:
             # x (Tensor): Node feature matrix with shape :obj:`[num_nodes, num_node_features]`
             # y (Tensor): Graph or node targets with arbitrary shape.
@@ -111,16 +119,27 @@ class GxlDataset(InMemoryDataset):
             # edge_attr (Tensor): Edge feature matrix with shape :obj:`[num_edges, num_edge_features]`
             # y (Tensor): Graph or node targets with arbitrary shape
 
-            if self.mean_std is not None:
+            if self.disable_feature_norm and self.mean_std is not None:
                 graph = normalize_graph(graph, self.mean_std)
-
+            # node
             x = torch.tensor(graph.node_features, dtype=torch.float)
+            pos = torch.tensor(graph.node_position, dtype=torch.float)
+            # edges
             edge_index = torch.tensor(graph.edges, dtype=torch.long).t().contiguous()
             edge_attr = torch.tensor(graph.edge_features, dtype=torch.float)
-            pos = torch.tensor(graph.node_position, dtype=torch.float)
+            # make graph undirected if necessary
+            if gxl_dataset.edge_mode == 'undirected' and len(edge_index) == 2:
+                row, col = edge_index
+                new_row = torch.cat([row, col], dim=0)
+                new_col = torch.cat([col, row], dim=0)
+                edge_index = torch.stack([new_row, new_col], dim=0)
+                edge_attr = torch.cat([edge_attr, edge_attr], dim=0)
+            # labels
             y = graph.class_label
-            g = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, y=y)
-
+            # file names
+            file_name_ind = file_names.index(graph.filename)
+            # make the graph
+            g = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, y=y, file_name_ind=file_name_ind)
             data_list.append(g)
 
         # save the data
@@ -130,8 +149,9 @@ class GxlDataset(InMemoryDataset):
             index, counts = np.unique(np.array(data.y), return_counts=True)
             counts = counts / sum(counts)
             config['class_freq'] = (index, counts)
+            config['file_names'] = file_names
 
-        torch.save((data, slices, config), os.path.join(self.processed_paths[0]))
+        torch.save((data, slices, config), self.processed_paths[0])
 
     @staticmethod
     def _setup_cat_feature_dict(json_path):

@@ -9,9 +9,8 @@ from .train import GraphClassificationTrain
 
 
 class GraphClassificationEvaluate(GraphClassificationTrain):
-
     @classmethod
-    def start_of_the_epoch(cls, model, num_classes, **kwargs):
+    def start_of_the_epoch(cls, model, num_classes, data_loader, **kwargs):
         """See parent method for documentation
 
         Extra-Parameters
@@ -22,10 +21,11 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
             Number of classes in the dataset
         """
         model.eval()
-
         MetricLogger().add_scalar_meter(tag=cls.main_metric())
         MetricLogger().add_scalar_meter(tag='loss')
         MetricLogger().add_confusion_matrix_meter(tag='confusion_matrix', num_classes=num_classes)
+        MetricLogger().add_classification_results_meter(tag='classification_results', file_list=data_loader.dataset.config['file_names'])
+
 
     @classmethod
     def run_one_mini_batch(cls, model, criterion, input, target, **kwargs):
@@ -43,9 +43,12 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
 
         # Update the confusion matrix
         MetricLogger().update(key='confusion_matrix', p=np.argmax(output.data.cpu().numpy(), axis=1), t=target.cpu().numpy())
+        # Update the classification results
+        MetricLogger().update(key='classification_results', p=np.argmax(output.data.cpu().numpy(), axis=1), t=target.cpu().numpy(),
+                            f_ind=input.file_name_ind.cpu().numpy())
 
     @classmethod
-    def end_of_the_epoch(cls, data_loader, epoch, logging_label, **kwargs):
+    def end_of_the_epoch(cls, data_loader, epoch, logging_label, current_log_folder=None, **kwargs):
         """See parent method for documentation
 
         Extra-Parameters
@@ -69,5 +72,7 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
         TBWriter().add_text(tag='Classification Report for epoch {}\n'.format(epoch),
                             text_string='\n' + cr,
                             global_step=epoch)
-        pass
 
+        if current_log_folder:
+            # save the clasification output as a csv
+            MetricLogger()['classification_results'].save_csv(output_folder=current_log_folder)

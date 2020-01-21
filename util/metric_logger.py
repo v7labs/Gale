@@ -46,6 +46,9 @@ class MetricLogger(metaclass=Singleton):
     def add_confusion_matrix_meter(self, tag: str, num_classes: int):
         self.add_meter(tag, ConfusionMatrix(num_classes))
 
+    def add_classification_results_meter(self, tag: str, file_list: list):
+        self.add_meter(tag, ClassificationResults(file_list))
+
     def add_meter(self, tag, meter):
         assert isinstance(meter, Meter)
         self._meters[tag + self._postfix] = meter
@@ -83,6 +86,36 @@ class Meter(object):
     @abstractmethod
     def update(self, **kwargs):
         raise NotImplementedError
+
+
+class ClassificationResults(Meter):
+    def __init__(self, file_list):
+        self.file_list = file_list
+        self.mat = np.empty((0, 3), dtype=int)
+
+    def update(self, p, t, f_ind):
+        """
+        Update the confusion matrix with the new entries
+
+        Parameters
+        ----------
+        p : ndarray[int]
+        t : ndarray[int]
+            Prediction and target arrays of integers
+        f_ind: index of filename in file name list
+        """
+        # Better safe than sorry ;)
+        assert isinstance(p, np.ndarray)
+        assert isinstance(t, np.ndarray)
+        assert p.size == t.size
+
+        self.mat = np.row_stack((self.mat, np.column_stack((f_ind, t, p))))
+
+    def save_csv(self, output_folder):
+        df = pd.DataFrame(self.mat)
+        df.columns = ['file_name', 'true_label', 'predicted_label']
+        df['file_name'] = df['file_name'].map({i: self.file_list[i] for i in df['file_name']})
+        df.to_csv(output_folder, index=False)
 
 
 class ScalarValue(Meter):
@@ -126,9 +159,7 @@ class ScalarValue(Meter):
     def value(self):
         return self.deque[-1]
 
-
 class ConfusionMatrix(Meter):
-
     def __init__(self, num_classes: int):
         self.num_classes = num_classes
         self.mat = np.zeros((num_classes, num_classes), dtype=int)

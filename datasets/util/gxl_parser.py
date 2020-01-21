@@ -7,7 +7,8 @@ from datasets.util.custom_exception import InvalidFileException
 
 
 class ParsedGxlDataset:
-    def __init__(self, path_to_dataset, categorical_features=None, subset="", use_position=False, features_to_use=None, no_empty_graphs=False):
+    def __init__(self, path_to_dataset, categorical_features=None, subset="", disable_position=False,
+                 features_to_use=None, no_empty_graphs=False):
         """
         This class creates a dataset object containing all the graphs parsed from gxl files as ParsedGxlGraph objects
 
@@ -22,7 +23,7 @@ class ParsedGxlDataset:
         """
         self.no_empty_graphs = no_empty_graphs
         self.subset = subset
-        self.use_position = use_position
+        self.disable_position = disable_position
         self.features_to_use = features_to_use
         if categorical_features is None:
             self.categorical_features = {'node': [], 'edge': []}
@@ -36,6 +37,7 @@ class ParsedGxlDataset:
         self.dataset_split = self.get_dataset_split()
 
         self.invalid_files = []
+        # if subset is specified only this is loaded, otherwise the whole dataset is loaded
         if len(self.subset) == 0:
             self.all_file_names = [f for f in os.listdir(path_to_dataset) if os.path.isfile(os.path.join(path_to_dataset, f)) if '.gxl' in f]
             self.graphs = self.get_graphs_all()
@@ -43,6 +45,8 @@ class ParsedGxlDataset:
             assert self.subset in ['train', 'valid', 'test']
             self.all_file_names = [f for f in self.dataset_split[self.subset] if os.path.isfile(os.path.join(path_to_dataset, f)) if '.gxl' in f]
             self.graphs = self.get_graphs()
+        # get a list of all the filenames
+        self.file_names = [g.filename for g in self.graphs]
 
         # get the node and edge feature names available at a higher level
         agraph = [g for g in self.graphs if len(g.node_features) > 0][0]
@@ -73,6 +77,10 @@ class ParsedGxlDataset:
 
     def __len__(self):
         return len(self.graphs)
+
+    @property
+    def edge_mode(self):
+        return self.graphs[0].edgemode
 
     def config(self):
         config = {
@@ -212,7 +220,7 @@ class ParsedGxlDataset:
                     print('{} does not appear in the dataset split files'.format(filename))
 
                 g = ParsedGxlGraph(os.path.join(self.root_path, filename), subset, self.class_int_encoding[class_label],
-                                   use_position=self.use_position, features_to_use=self.features_to_use, no_empty_graphs=self.no_empty_graphs)
+                                   disable_position=self.disable_position, features_to_use=self.features_to_use, no_empty_graphs=self.no_empty_graphs)
                 graphs.append(g)
             except InvalidFileException:
                 print('File {} is invalid. Please verify that the file contains the expected attributes (id, edgeids, edgemode and nodes and edges, if expected)'.format(filename))
@@ -244,7 +252,7 @@ class ParsedGxlDataset:
                     print('{} does not appear in the dataset split files'.format(filename))
 
                 g = ParsedGxlGraph(os.path.join(self.root_path, filename), self.subset, self.class_int_encoding[class_label],
-                                   use_position=self.use_position, features_to_use=self.features_to_use)
+                                   disable_position=self.disable_position, features_to_use=self.features_to_use)
                 graphs.append(g)
             except InvalidFileException:
                 print('File {} is invalid. Please verify that the file contains the expected attributes (node, edge, id, edgeids and edgemode)'.format(filename))
@@ -283,7 +291,7 @@ class ParsedGxlDataset:
 
 
 class ParsedGxlGraph:
-    def __init__(self, path_to_gxl, subset, class_label, use_position=True, features_to_use=None, no_empty_graphs=False):
+    def __init__(self, path_to_gxl, subset, class_label, disable_position=False, features_to_use=None, no_empty_graphs=False):
         """
         This class contains all the information encoded in a single gxl file = one graph
         Parameters
@@ -299,7 +307,7 @@ class ParsedGxlGraph:
         self.no_empty_graphs = no_empty_graphs
 
         self.features_to_use = features_to_use
-        self.use_position = use_position
+        self.disable_position = disable_position
         # path to the gxl file
         self.filepath = path_to_gxl
         # name of the gxl file (without the ending)
@@ -340,7 +348,7 @@ class ParsedGxlGraph:
             y_ind = node_feature_names.index('y')
             node_position = [[node[x_ind], node[y_ind]] for node in node_features]
             # remove the positions from the node features if we don't want to use them
-            if not self.use_position:
+            if self.disable_position:
                 for node in node_features:
                     del node[x_ind]
                     del node[y_ind-1]
@@ -350,7 +358,7 @@ class ParsedGxlGraph:
             node_position = []
 
         edge_feature_names, edge_features = self.get_features(root, 'edge')
-
+        #TODO: ensure that graph is undirected!
         return self.get_graph_attr(root), node_feature_names, node_features, node_position, edge_feature_names, edge_features, edges
 
     def get_features(self, root, mode):
@@ -500,8 +508,9 @@ def normalize_graph(graph, mean_std):
     Normalized graph
 
     """
-    def z_normalize(feature, mean, std):
+    # TODO: make this work for when only selected features are used
 
+    def z_normalize(feature, mean, std):
         return (feature - mean) / std
 
     node_mean = mean_std['node_features']['mean']

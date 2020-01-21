@@ -124,7 +124,55 @@ class GraphClassificationIamdb(BaseRunner):
             "epoch_lr_schedulers": epoch_lr_schedulers,
         }
 
+    def test_routine(self, model,  criterion, epochs, current_log_folder,
+                     **kwargs):
+        """
+        Load the best model according to the validation score (early stopping) and runs the test routine.
 
+        Parameters
+        ----------
+        model : DataParallel
+            The model to train
+        criterion : torch.nn.modules.loss
+            Loss function to use, e.g. cross-entropy
+        epochs : int
+            After how many epochs are we testing
+        current_log_folder : string
+            Path to where logs/checkpoints are saved
+
+        Returns
+        -------
+        test_value : float
+            Accuracy value for test split
+        """
+
+        # Load the best model before evaluating on the test set (early stopping)
+        logging.info('Loading the best model before evaluating on the test set.')
+
+        if kwargs["load_model"] is not None:
+            if not os.path.exists(kwargs["load_model"]):
+                logging.error(f"Could not find model {kwargs['load_model']}. Terminating.")
+                raise SystemExit
+        elif os.path.exists(os.path.join(current_log_folder, 'best.pth')):
+            kwargs["load_model"] = os.path.join(current_log_folder, 'best.pth')
+        else:
+            logging.warning('File model_best.pth.tar not found in {}'.format(current_log_folder))
+            logging.warning('Using checkpoint.pth.tar instead')
+            if os.path.exists(os.path.join(current_log_folder, 'checkpoint.pth')):
+                kwargs["load_model"] = os.path.join(current_log_folder, 'checkpoint.pth')
+            else:
+                logging.warning('File checkpoint.pth.tar not found in {}'.format(current_log_folder))
+                logging.error('Both best.pth and checkpoint.pth are not not found in {}. Terminating.'
+                              .format(current_log_folder))
+                raise SystemExit
+
+        model = self.setup.setup_model(**kwargs)
+
+        # Test
+        test_value = self._test(model=model, criterion=criterion, epoch=epochs - 1, current_log_folder=current_log_folder, **kwargs)
+        logging.info(f'Test: {test_value}')
+        logging.info('Training completed')
+        return test_value
 
     ####################################################################################################################
     """

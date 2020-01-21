@@ -369,7 +369,8 @@ class RunMe:
             rdir = os.path.join(os.path.dirname(__file__), 'runner')
             packages_in_runner = [name for name in os.listdir(rdir) if os.path.isdir(os.path.join(rdir, name))]
             packages_in_runner.remove('base')
-            packages_in_runner.remove('__pycache__')
+            if '__pycache__' in packages_in_runner:
+                packages_in_runner.remove('__pycache__')
             return {n: c
                     for pkg in packages_in_runner
                     for n, c in inspect.getmembers(importlib.import_module('template.runner.' + pkg), inspect.isclass)
