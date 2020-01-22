@@ -509,7 +509,6 @@ def normalize_graph(graph, mean_std):
 
     """
     # TODO: make this work for when only selected features are used
-
     def z_normalize(feature, mean, std):
         return (feature - mean) / std
 
@@ -518,17 +517,24 @@ def normalize_graph(graph, mean_std):
     edge_mean = mean_std['edge_features']['mean']
     edge_std = mean_std['edge_features']['std']
 
-
     # normalize the node features, if none are present initialize a random node
+    # if len(graph.node_features) > 0:
+    #     for node_ind in range(len(graph.node_features)):
+    #         graph.node_features[node_ind] = [z_normalize(graph.node_features[node_ind][i], node_mean[i], node_std[i])
+    #                                          for i in range(len(node_mean))]
+    # else:
+    #    graph.node_features = [np.random.normal(node_mean, node_std, len(node_mean))]
+
+    # check if graph is not empty
     if len(graph.node_features) > 0:
+        # normalize the node features
         for node_ind in range(len(graph.node_features)):
             graph.node_features[node_ind] = [z_normalize(graph.node_features[node_ind][i], node_mean[i], node_std[i])
                                              for i in range(len(node_mean))]
-    else:
-        graph.node_features = [np.random.normal(node_mean, node_std, len(node_mean))]
-    # normalize the edge features
-    for edge_ind in range(len(graph.edge_features)):
-        graph.edge_features[edge_ind] = [z_normalize(graph.edge_features[edge_ind][i], edge_mean[i], edge_std[i])
-                                         for i in range(len(edge_mean))]
+        # normalize the edge features
+        for edge_ind in range(len(graph.edge_features)):
+            graph.edge_features[edge_ind] = [z_normalize(graph.edge_features[edge_ind][i], edge_mean[i], edge_std[i])
+                                             for i in range(len(edge_mean))]
 
     return graph
+

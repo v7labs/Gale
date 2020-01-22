@@ -39,7 +39,7 @@ class GxlDataset(InMemoryDataset):
             e.g. "symbol,valence"
         mean_std: dict (optional)
             default None. Dictionary containing the mean and std of the node and edge features. If not none, the normalzation
-            will be performed and empty graphs will be initialized with a random value.
+            will be performed.
 
         """
         self.transform = None
@@ -119,7 +119,7 @@ class GxlDataset(InMemoryDataset):
             # edge_attr (Tensor): Edge feature matrix with shape :obj:`[num_edges, num_edge_features]`
             # y (Tensor): Graph or node targets with arbitrary shape
 
-            if self.disable_feature_norm and self.mean_std is not None:
+            if not self.disable_feature_norm and self.mean_std is not None:
                 graph = normalize_graph(graph, self.mean_std)
             # node
             x = torch.tensor(graph.node_features, dtype=torch.float)

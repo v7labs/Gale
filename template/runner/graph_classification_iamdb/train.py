@@ -142,9 +142,6 @@ class GraphClassificationTrain(BaseRoutine):
         # Compute output
         output = model(input)
 
-        # # Unpack the target
-        # target = target['class']
-
         # Compute and record the loss
         loss = criterion(output, target)
         MetricLogger().update(key='loss', value=loss.item(), n=len(input))
@@ -189,7 +186,6 @@ class GraphClassificationTrain(BaseRoutine):
                     for k, v in elem.items():
                         elem[k] = move_to_cuda(v)
                 else:
-                    #elem = elem.to(torch.device('cuda'))
                     elem = elem.to(torch.device('cuda:{}'.format(os.environ['CUDA_VISIBLE_DEVICES'])))
             return elem
 
