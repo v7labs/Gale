@@ -31,7 +31,7 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
     def run_one_mini_batch(cls, model, criterion, input, target, **kwargs):
         """See parent method for documentation"""
         # Compute output
-        output = model(input)
+        output = model(input, target_size=target.shape[0])
 
         # Compute and record the loss
         loss = criterion(output, target)
@@ -76,3 +76,4 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
         if current_log_folder:
             # save the clasification output as a csv
             MetricLogger()['classification_results'].save_csv(output_folder=current_log_folder)
+

@@ -87,10 +87,11 @@ class GraphClassificationTrain(BaseRoutine):
             end = time.time()
 
             # Log to console
+            # TODO: fix console logging (and check tensorboard) -> adjust for multi_run_label
             if batch_idx % log_interval == 0 and len(MetricLogger()) > 0:
-                if cls.main_metric() in MetricLogger():
+                if cls.main_metric()+multi_run_label in MetricLogger():
                     mlogger = MetricLogger()[cls.main_metric()]
-                elif "loss" in MetricLogger():
+                elif "loss"+multi_run_label in MetricLogger():
                     mlogger = MetricLogger()["loss"]
                 else:
                     raise AttributeError
@@ -111,7 +112,7 @@ class GraphClassificationTrain(BaseRoutine):
             if isinstance(meter, ScalarValue):
                 TBWriter().add_scalar(tag=logging_label + '/' + tag, scalar_value=meter.global_avg, global_step=epoch)
 
-        if cls.main_metric() in MetricLogger():
+        if cls.main_metric()+multi_run_label in MetricLogger():
             return MetricLogger()[cls.main_metric()].global_avg
         else:
             return 0
@@ -140,7 +141,7 @@ class GraphClassificationTrain(BaseRoutine):
             The optimizer used to perform the weight update.
         """
         # Compute output
-        output = model(input)
+        output = model(input, target_size=target.shape[0])
 
         # Compute and record the loss
         loss = criterion(output, target)

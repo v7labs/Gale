@@ -3,6 +3,7 @@ import logging
 import traceback
 from abc import abstractmethod
 from collections import deque
+import os
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -115,7 +116,7 @@ class ClassificationResults(Meter):
         df = pd.DataFrame(self.mat)
         df.columns = ['file_name', 'true_label', 'predicted_label']
         df['file_name'] = df['file_name'].map({i: self.file_list[i] for i in df['file_name']})
-        df.to_csv(output_folder, index=False)
+        df.to_csv(os.path.join(output_folder, 'classification-results.csv'), index=False)
 
 
 class ScalarValue(Meter):

@@ -211,6 +211,9 @@ class RunMe:
         runner_class = [c for c in sub_classes if to_capital_camel_case(runner_class).lower() == c.__name__.lower()]
         assert len(runner_class) == 1
         runner_class = runner_class[0]
+        # TODO: make this more elegant
+        # repack the runner_class with the reference for the actual runner, not as a string
+        unpacked_args['runner_class'] = runner_class
 
         logging.warning(f'Current working directory is: {os.getcwd()}')
 
@@ -314,11 +317,13 @@ class RunMe:
         # As many times as runs
         for i in range(multi_run):
             logging.info('Multi-Run: {} of {}'.format(i + 1, multi_run))
-            train_scores[i, :], val_scores[i, :], test_scores[i] = runner_class.single_run(run=i,
-                                                                                           current_log_folder=current_log_folder,
-                                                                                           multi_run=multi_run,
-                                                                                           epochs=epochs,
-                                                                                           **kwargs)
+            performance = runner_class().single_run(run=i,
+                                                    current_log_folder=current_log_folder,
+                                                    multi_run=multi_run,
+                                                    epochs=epochs,
+                                                    **kwargs)
+            train_scores[i, :], val_scores[i, :], test_scores[i] = (performance['train'], performance['val'], performance['test'])
+
 
             # Generate and add to tensorboard the shaded plot for train
             train_curve = plot_mean_std(arr=train_scores[:i + 1],

@@ -105,12 +105,12 @@ class GraphConv0TPK(torch.nn.Module):
         self.lin1 = torch.nn.Linear(128, 64)
         self.lin2 = torch.nn.Linear(64, output_channels)
 
-    def forward(self, data):
+    def forward(self, data, target_size=None):
         x, edge_index, batch = data.x, data.edge_index, data.batch
         x = F.relu(self.conv1(x, edge_index))
         x = F.relu(self.conv2(x, edge_index))
         x = F.relu(self.conv3(x, edge_index))
-        x = global_mean_pool(x, batch)
+        x = global_mean_pool(x, batch, size=target_size)
 
         x = F.relu(self.lin1(x))
         x = F.log_softmax(self.lin2(x), dim=-1)
