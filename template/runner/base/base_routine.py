@@ -83,12 +83,13 @@ class BaseRoutine:
 
             # Log to console
             if batch_idx % log_interval == 0 and len(MetricLogger()) > 0:
-                if cls.main_metric() in MetricLogger():
-                    mlogger = MetricLogger()[cls.main_metric()]
-                elif "loss" in MetricLogger():
-                    mlogger = MetricLogger()["loss"]
-                else:
-                    raise AttributeError
+                if batch_idx % log_interval == 0 and len(MetricLogger()) > 0:
+                    if cls.main_metric() + multi_run_label in MetricLogger():
+                        mlogger = MetricLogger()[cls.main_metric()]
+                    elif "loss" + multi_run_label in MetricLogger():
+                        mlogger = MetricLogger()["loss"]
+                    else:
+                        raise AttributeError
                 pbar.set_description(f'{logging_label} epoch [{epoch}][{batch_idx}/{len(data_loader)}]')
                 pbar.set_postfix(Metric=f'{mlogger.global_avg:.3f}',
                                  Time=f'{batch_time:.3f}',

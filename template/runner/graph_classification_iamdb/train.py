@@ -12,7 +12,6 @@ from util.TB_writer import TBWriter
 
 
 class GraphClassificationTrain(BaseRoutine):
-    # TODO: implement multi-run
     @classmethod
     def run(cls, data_loader, epoch, log_interval, logging_label, batch_lr_schedulers, run=None,
             **kwargs):
@@ -87,7 +86,6 @@ class GraphClassificationTrain(BaseRoutine):
             end = time.time()
 
             # Log to console
-            # TODO: fix console logging (and check tensorboard) -> adjust for multi_run_label
             if batch_idx % log_interval == 0 and len(MetricLogger()) > 0:
                 if cls.main_metric()+multi_run_label in MetricLogger():
                     mlogger = MetricLogger()[cls.main_metric()]
