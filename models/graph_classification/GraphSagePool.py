@@ -1,4 +1,4 @@
-from torch_geometric.nn import TopKPooling, GraphConv
+from torch_geometric.nn import TopKPooling, SAGEConv
 from torch_geometric.nn import global_mean_pool, global_max_pool
 
 import torch
@@ -7,7 +7,7 @@ from torch.nn import Linear, functional as F
 from models.registry import Model
 
 
-class GraphConv3TPK(torch.nn.Module):
+class GraphSage3TPK(torch.nn.Module):
     def __init__(self, num_features, output_channels):
         """
 
@@ -18,13 +18,13 @@ class GraphConv3TPK(torch.nn.Module):
         output_channels: int
             number of classes
         """
-        super(GraphConv3TPK, self).__init__()
+        super(GraphSage3TPK, self).__init__()
 
-        self.conv1 = GraphConv(num_features, 128)
+        self.conv1 = SAGEConv(num_features, 128)
         self.pool1 = TopKPooling(128, ratio=0.8)
-        self.conv2 = GraphConv(128, 128)
+        self.conv2 = SAGEConv(128, 128)
         self.pool2 = TopKPooling(128, ratio=0.8)
-        self.conv3 = GraphConv(128, 128)
+        self.conv3 = SAGEConv(128, 128)
         self.pool3 = TopKPooling(128, ratio=0.8)
 
         self.lin1 = torch.nn.Linear(128, 64)
@@ -49,7 +49,7 @@ class GraphConv3TPK(torch.nn.Module):
         return x
 
 
-class GraphConv1TPK(torch.nn.Module):
+class GraphSage1TPK(torch.nn.Module):
     def __init__(self, num_features, output_channels):
         """
 
@@ -60,12 +60,12 @@ class GraphConv1TPK(torch.nn.Module):
         output_channels: int
             number of classes
         """
-        super(GraphConv1TPK, self).__init__()
+        super(GraphSage1TPK, self).__init__()
 
-        self.conv1 = GraphConv(num_features, 128)
-        self.conv2 = GraphConv(128, 128)
+        self.conv1 = SAGEConv(num_features, 128)
+        self.conv2 = SAGEConv(128, 128)
         self.pool = TopKPooling(128, ratio=0.8)
-        self.conv3 = GraphConv(128, 128)
+        self.conv3 = SAGEConv(128, 128)
 
         self.lin1 = torch.nn.Linear(128, 64)
         self.lin2 = torch.nn.Linear(64, output_channels)
@@ -85,7 +85,7 @@ class GraphConv1TPK(torch.nn.Module):
         return x
 
 
-class GraphConv0TPK(torch.nn.Module):
+class GraphSage0TPK(torch.nn.Module):
     def __init__(self, num_features, output_channels):
         """
 
@@ -96,11 +96,11 @@ class GraphConv0TPK(torch.nn.Module):
         output_channels: int
             number of classes
         """
-        super(GraphConv0TPK, self).__init__()
+        super(GraphSage0TPK, self).__init__()
 
-        self.conv1 = GraphConv(num_features, 128)
-        self.conv2 = GraphConv(128, 128)
-        self.conv3 = GraphConv(128, 128)
+        self.conv1 = SAGEConv(num_features, 128)
+        self.conv2 = SAGEConv(128, 128)
+        self.conv3 = SAGEConv(128, 128)
 
         self.lin1 = torch.nn.Linear(128, 64)
         self.lin2 = torch.nn.Linear(64, output_channels)
@@ -119,25 +119,25 @@ class GraphConv0TPK(torch.nn.Module):
 
 
 @Model
-def graphconv0TPK(num_features, output_channels, **kwargs):
+def graphsage0TPK(num_features, output_channels, **kwargs):
     """
     Simple Graph Convolution Neural Network
     """
-    return GraphConv0TPK(num_features, output_channels)
+    return GraphSage0TPK(num_features, output_channels)
 
 
 @Model
-def graphconv1TPK(num_features, output_channels, **kwargs):
+def graphsage1TPK(num_features, output_channels, **kwargs):
     """
     Simple Graph Convolution Neural Network
     """
-    return GraphConv1TPK(num_features, output_channels)
+    return GraphSage1TPK(num_features, output_channels)
 
 
 @Model
-def graphconv3TPK(num_features, output_channels, **kwargs):
+def graphsage3TPK(num_features, output_channels, **kwargs):
     """
     Simple Graph Convolution Neural Network
     """
-    return GraphConv3TPK(num_features, output_channels)
+    return GraphSage3TPK(num_features, output_channels)
 

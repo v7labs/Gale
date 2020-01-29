@@ -10,7 +10,7 @@ from .train import GraphClassificationTrain
 
 class GraphClassificationEvaluate(GraphClassificationTrain):
     @classmethod
-    def start_of_the_epoch(cls, model, num_classes, data_loader, **kwargs):
+    def start_of_the_epoch(cls, model, num_classes, data_loader, multi_run_label, **kwargs):
         """See parent method for documentation
 
         Extra-Parameters
@@ -28,7 +28,7 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
 
 
     @classmethod
-    def run_one_mini_batch(cls, model, criterion, input, target, **kwargs):
+    def run_one_mini_batch(cls, model, criterion, input, target, multi_run_label, **kwargs):
         """See parent method for documentation"""
         # Compute output
         output = model(input, target_size=target.shape[0])
@@ -45,10 +45,10 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
         MetricLogger().update(key='confusion_matrix', p=np.argmax(output.data.cpu().numpy(), axis=1), t=target.cpu().numpy())
         # Update the classification results
         MetricLogger().update(key='classification_results', p=np.argmax(output.data.cpu().numpy(), axis=1), t=target.cpu().numpy(),
-                            f_ind=input.file_name_ind.cpu().numpy())
+                          f_ind=input.file_name_ind.cpu().numpy())
 
     @classmethod
-    def end_of_the_epoch(cls, data_loader, epoch, logging_label, current_log_folder=None, **kwargs):
+    def end_of_the_epoch(cls, data_loader, epoch, logging_label, multi_run_label, current_log_folder=None, **kwargs):
         """See parent method for documentation
 
         Extra-Parameters
@@ -61,19 +61,31 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
             Label for logging purposes. Typically 'train', 'test' or 'valid'.
             It's prepended to the logging output path and messages.
         """
+        #TODO: check if TB logging works for multi-class --> if yes correct in base_runner
         classes = data_loader.dataset.config['classes']
 
         # Make and log to TB the confusion matrix
         cm = MetricLogger()['confusion_matrix'].make_heatmap(classes)
-        TBWriter().save_image(tag=logging_label + '/confusion_matrix', image=cm, global_step=epoch)
+        TBWriter().save_image(tag=logging_label + '/confusion_matrix'+multi_run_label, image=cm, global_step=epoch)
 
         # Generate a classification report for each epoch
         cr = MetricLogger()['confusion_matrix'].get_classification_report(classes)
-        TBWriter().add_text(tag='Classification Report for epoch {}\n'.format(epoch),
+        multi_tag = ''
+        if len(multi_run_label) > 0:
+            multi_tag = ' and run {}'.format(multi_run_label)
+        TBWriter().add_text(tag='Classification Report for epoch {}{}\n'.format(epoch, multi_tag),
                             text_string='\n' + cr,
                             global_step=epoch)
 
         if current_log_folder:
+            multi_tag = ''
+            if len(multi_run_label) > 0:
+                multi_tag = '_run_{}'.format(multi_run_label)
             # save the clasification output as a csv
-            MetricLogger()['classification_results'].save_csv(output_folder=current_log_folder)
+            MetricLogger()['classification_results{}'.format(multi_tag)].save_csv(output_folder=current_log_folder, multi_run_label=multi_run_label)
+            # TODO save to TB
+            # report = MetricLogger()['classification_results{}'.format(multi_tag)].get_report()
+            # TBWriter().add_text(tag='Classification per test file\n'.format(epoch, multi_tag),
+            #                 text_string='\n' + report,
+            #                 global_step=epoch)
 

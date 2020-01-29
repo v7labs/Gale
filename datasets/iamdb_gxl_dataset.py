@@ -103,6 +103,11 @@ class GxlDataset(InMemoryDataset):
                                        disable_position=self.use_position, features_to_use=self.features_to_use,
                                        no_empty_graphs=self.no_empty_graphs)
 
+        # make a csv with the number of nodes per graph
+        df = pd.DataFrame.from_records([[g.filename, int(g.nb_of_nodes), int(g.nb_of_edges)] for g in gxl_dataset.graphs],
+                                       columns=['filename', 'nb_of_nodes', 'nb_of_edges']).sort_values(by=['filename'])
+        df.to_csv(os.path.join(os.path.dirname(self.processed_paths[0]), 'nb_nodes_edges_per_graph.csv'), index=False)
+
         config = gxl_dataset.config
         data_list = []
 
@@ -150,6 +155,10 @@ class GxlDataset(InMemoryDataset):
             counts = counts / sum(counts)
             config['class_freq'] = (index, counts)
             config['file_names'] = file_names
+
+        # TODO: fix this
+        # with open(os.path.join(os.path.dirname(self.processed_paths[0]), 'graphs_config.json'), 'w') as fp:
+        #     json.dump(config, fp)
 
         torch.save((data, slices, config), self.processed_paths[0])
 

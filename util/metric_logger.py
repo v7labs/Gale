@@ -112,12 +112,20 @@ class ClassificationResults(Meter):
 
         self.mat = np.row_stack((self.mat, np.column_stack((f_ind, t, p))))
 
-    def save_csv(self, output_folder):
+    def save_csv(self, output_folder, multi_run_label):
         df = pd.DataFrame(self.mat)
         df.columns = ['file_name', 'true_label', 'predicted_label']
         df['file_name'] = df['file_name'].map({i: self.file_list[i] for i in df['file_name']})
-        df.to_csv(os.path.join(output_folder, 'classification-results.csv'), index=False)
+        if len(multi_run_label) > 0:
+            multi_run_label = '-run_' + multi_run_label
+        df.to_csv(os.path.join(output_folder, 'classification-results{}.csv'.format(multi_run_label)), index=False)
 
+    # TODO add report function for TB
+    def get_report(self):
+        # The weird formatting is a fix for TB writer.
+        # Its an ugly workaround to have it printed nicely in the TEXT section of TB.
+        s = ''
+        return s
 
 class ScalarValue(Meter):
     """
@@ -265,12 +273,6 @@ class ConfusionMatrix(Meter):
             f"{'{:>20}'.format('accuracy')}:\t"   + f"{acc * 100:.1f}\n\n       "
         )
         return s
-
-
-
-
-
-
 
 
 
