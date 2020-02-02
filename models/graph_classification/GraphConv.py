@@ -8,7 +8,7 @@ from models.registry import Model
 
 
 class GraphConv3TPK(torch.nn.Module):
-    def __init__(self, num_features, output_channels):
+    def __init__(self, num_features, output_channels, **kwargs):
         """
 
         Parameters
@@ -30,7 +30,7 @@ class GraphConv3TPK(torch.nn.Module):
         self.lin1 = torch.nn.Linear(128, 64)
         self.lin2 = torch.nn.Linear(64, output_channels)
 
-    def forward(self, data, target_size=None):
+    def forward(self, data, target_size=None, **kwargs):
         x, edge_index, batch = data.x, data.edge_index, data.batch
         x = F.relu(self.conv1(x, edge_index))
         x, edge_index, _, batch, _, _ = self.pool1(x, edge_index, None, batch)
@@ -50,7 +50,7 @@ class GraphConv3TPK(torch.nn.Module):
 
 
 class GraphConv1TPK(torch.nn.Module):
-    def __init__(self, num_features, output_channels):
+    def __init__(self, num_features, output_channels, **kwargs):
         """
 
         Parameters
@@ -70,7 +70,7 @@ class GraphConv1TPK(torch.nn.Module):
         self.lin1 = torch.nn.Linear(128, 64)
         self.lin2 = torch.nn.Linear(64, output_channels)
 
-    def forward(self, data, target_size=None):
+    def forward(self, data, target_size=None, **kwargs):
         x, edge_index, batch = data.x, data.edge_index, data.batch
         x = F.relu(self.conv1(x, edge_index))
         x = F.relu(self.conv2(x, edge_index))
@@ -86,7 +86,7 @@ class GraphConv1TPK(torch.nn.Module):
 
 
 class GraphConv0TPK(torch.nn.Module):
-    def __init__(self, num_features, output_channels):
+    def __init__(self, num_features, output_channels, **kwargs):
         """
 
         Parameters
@@ -105,7 +105,7 @@ class GraphConv0TPK(torch.nn.Module):
         self.lin1 = torch.nn.Linear(128, 64)
         self.lin2 = torch.nn.Linear(64, output_channels)
 
-    def forward(self, data, target_size=None):
+    def forward(self, data, target_size=None, **kwargs):
         x, edge_index, batch = data.x, data.edge_index, data.batch
         x = F.relu(self.conv1(x, edge_index))
         x = F.relu(self.conv2(x, edge_index))
@@ -123,7 +123,7 @@ def graphconv0TPK(num_features, output_channels, **kwargs):
     """
     Simple Graph Convolution Neural Network
     """
-    return GraphConv0TPK(num_features, output_channels)
+    return GraphConv0TPK(num_features, output_channels, **kwargs)
 
 
 @Model
@@ -131,7 +131,7 @@ def graphconv1TPK(num_features, output_channels, **kwargs):
     """
     Simple Graph Convolution Neural Network
     """
-    return GraphConv1TPK(num_features, output_channels)
+    return GraphConv1TPK(num_features, output_channels, **kwargs)
 
 
 @Model

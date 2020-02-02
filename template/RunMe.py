@@ -348,6 +348,9 @@ class RunMe:
         np.save(os.path.join(current_log_folder, 'train_values.npy'), train_scores)
         np.save(os.path.join(current_log_folder, 'val_values.npy'), val_scores)
         logging.info('Multi-run values for test-mean:{} test-std: {}'.format(np.mean(test_scores), np.std(test_scores)))
+        s = 'mean: {}\n\nstd: {}'.format(np.mean(test_scores), np.std(test_scores))
+        TBWriter().add_text(tag='Performance average and std over {} runs\n'.format(multi_run),
+                            text_string=s)
 
         return train_scores, val_scores, test_scores
 

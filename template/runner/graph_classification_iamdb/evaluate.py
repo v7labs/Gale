@@ -77,15 +77,14 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
                             text_string='\n' + cr,
                             global_step=epoch)
 
+        # only during testing
         if current_log_folder:
             multi_tag = ''
             if len(multi_run_label) > 0:
-                multi_tag = '_run_{}'.format(multi_run_label)
+                multi_tag = ' run{}'.format(multi_run_label)
             # save the clasification output as a csv
-            MetricLogger()['classification_results{}'.format(multi_tag)].save_csv(output_folder=current_log_folder, multi_run_label=multi_run_label)
-            # TODO save to TB
-            # report = MetricLogger()['classification_results{}'.format(multi_tag)].get_report()
-            # TBWriter().add_text(tag='Classification per test file\n'.format(epoch, multi_tag),
-            #                 text_string='\n' + report,
-            #                 global_step=epoch)
+            MetricLogger()['classification_results{}'.format(multi_run_label)].save_csv(output_folder=current_log_folder, multi_run_label=multi_run_label)
+            report = MetricLogger()['classification_results{}'.format(multi_run_label)].get_report()
+            TBWriter().add_text(tag='Classification per test file {}\n'.format(multi_tag),
+                            text_string='\n' + report)
 
