@@ -10,41 +10,41 @@ import torch
 import torchvision
 import zipfile
 from PIL import Image
-from scipy.io import loadmat as _loadmat
-
+from pathlib import Path
 from datasets.util.dataset_splitter import split_dataset
 from util.misc import make_folder_if_not_exists
 
 
-def mnist(output_folder, **kwargs):
+def mnist(args):
     """
     Fetches and prepares (in a DeepDIVA friendly format) the MNIST dataset to the location specified
     on the file system
 
     Parameters
     ----------
-    output_folder : str
-        Path to folder where to put the dataset
+    args : dict
+        List of arguments necessary to run this routine. In particular its necessary to provide
+        output_folder as String containing the path where the dataset will be downloaded
 
     Returns
     -------
         None
     """
     # Use torchvision to download the dataset
-    torchvision.datasets.MNIST(root=output_folder, download=True)
+    torchvision.datasets.MNIST(root=args.output_folder, download=True)
 
     # Load the data into memory
-    train_data, train_labels = torch.load(os.path.join(output_folder,
+    train_data, train_labels = torch.load(os.path.join(args.output_folder,
                                                        'MNIST',
                                                        'processed',
                                                        'training.pt'))
-    test_data, test_labels = torch.load(os.path.join(output_folder,
+    test_data, test_labels = torch.load(os.path.join(args.output_folder,
                                                      'MNIST',
                                                      'processed',
                                                      'test.pt'))
 
     # Make output folders
-    dataset_root = os.path.join(output_folder, 'MNIST')
+    dataset_root = os.path.join(args.output_folder, 'MNIST')
     train_folder = os.path.join(dataset_root, 'train')
     test_folder = os.path.join(dataset_root, 'test')
 
@@ -62,45 +62,48 @@ def mnist(output_folder, **kwargs):
     _write_data_to_folder(train_data, train_labels, train_folder)
     _write_data_to_folder(test_data, test_labels, test_folder)
 
-    shutil.rmtree(os.path.join(output_folder, 'MNIST', 'raw'))
-    shutil.rmtree(os.path.join(output_folder, 'MNIST', 'processed'))
+    shutil.rmtree(os.path.join(args.output_folder, 'MNIST', 'raw'))
+    shutil.rmtree(os.path.join(args.output_folder, 'MNIST', 'processed'))
+
     split_dataset(dataset_folder=dataset_root, split=0.2, symbolic=False)
 
 
-
-def svhn(output_folder, **kwargs):
+def svhn(args):
     """
     Fetches and prepares (in a DeepDIVA friendly format) the SVHN dataset to the location specified
     on the file system
 
     Parameters
     ----------
-    output_folder : str
-        Path to folder where to put the dataset
+    args : dict
+        List of arguments necessary to run this routine. In particular its necessary to provide
+        output_folder as String containing the path where the dataset will be downloaded
 
     Returns
     -------
         None
     """
+    from scipy.io import loadmat as _loadmat
+
     # Use torchvision to download the dataset
-    torchvision.datasets.SVHN(root=output_folder, split='train', download=True)
-    torchvision.datasets.SVHN(root=output_folder, split='test', download=True)
+    torchvision.datasets.SVHN(root=args.output_folder, split='train', download=True)
+    torchvision.datasets.SVHN(root=args.output_folder, split='test', download=True)
 
     # Load the data into memory
-    train = _loadmat(os.path.join(output_folder,
+    train = _loadmat(os.path.join(args.output_folder,
                                   'train_32x32.mat'))
     train_data, train_labels = train['X'], train['y'].astype(np.int64).squeeze()
     np.place(train_labels, train_labels == 10, 0)
     train_data = np.transpose(train_data, (3, 0, 1, 2))
 
-    test = _loadmat(os.path.join(output_folder,
+    test = _loadmat(os.path.join(args.output_folder,
                                  'test_32x32.mat'))
     test_data, test_labels = test['X'], test['y'].astype(np.int64).squeeze()
     np.place(test_labels, test_labels == 10, 0)
     test_data = np.transpose(test_data, (3, 0, 1, 2))
 
     # Make output folders
-    dataset_root = os.path.join(output_folder, 'SVHN')
+    dataset_root = os.path.join(args.output_folder, 'SVHN')
     train_folder = os.path.join(dataset_root, 'train')
     test_folder = os.path.join(dataset_root, 'test')
 
@@ -118,8 +121,8 @@ def svhn(output_folder, **kwargs):
     _write_data_to_folder(train_data, train_labels, train_folder)
     _write_data_to_folder(test_data, test_labels, test_folder)
 
-    os.remove(os.path.join(output_folder, 'train_32x32.mat'))
-    os.remove(os.path.join(output_folder, 'test_32x32.mat'))
+    os.remove(os.path.join(args.output_folder, 'train_32x32.mat'))
+    os.remove(os.path.join(args.output_folder, 'test_32x32.mat'))
 
     split_dataset(dataset_folder=dataset_root, split=0.2, symbolic=False)
 
@@ -138,6 +141,19 @@ def cifar10(output_folder, **kwargs):
     -------
         None
     """
+    # Make output folders
+    dataset_root = os.path.join(output_folder, 'CIFAR10')
+    train_folder = os.path.join(dataset_root, 'train')
+    test_folder = os.path.join(dataset_root, 'test')
+
+    if Path(dataset_root).exists():
+        print(f"Path ({dataset_root}) already exists. Nothing done")
+        return
+
+    make_folder_if_not_exists(dataset_root)
+    make_folder_if_not_exists(train_folder)
+    make_folder_if_not_exists(test_folder)
+
     # Use torchvision to download the dataset
     cifar_train = torchvision.datasets.CIFAR10(root=output_folder, train=True, download=True)
     cifar_test = torchvision.datasets.CIFAR10(root=output_folder, train=False, download=True)
@@ -152,15 +168,6 @@ def cifar10(output_folder, **kwargs):
                            5: 'dog', 6: 'frog', 7: 'horse', 8: 'ship', 9: 'truck'}
     train_labels = [class_names_mapping[l] for l in train_labels]
     test_labels = [class_names_mapping[l] for l in test_labels]
-
-    # Make output folders
-    dataset_root = os.path.join(output_folder, 'CIFAR10')
-    train_folder = os.path.join(dataset_root, 'train')
-    test_folder = os.path.join(dataset_root, 'test')
-
-    make_folder_if_not_exists(dataset_root)
-    make_folder_if_not_exists(train_folder)
-    make_folder_if_not_exists(test_folder)
 
     def _write_data_to_folder(arr, labels, folder):
         for i, (img, label) in enumerate(zip(arr, labels)):

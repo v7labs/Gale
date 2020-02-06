@@ -19,7 +19,7 @@ class Inception3(nn.Module):
 
     expected_input_size = (299, 299)
 
-    def __init__(self, output_channels, aux_logits=True, transform_input=False, **kwargs):
+    def __init__(self, num_classes, aux_logits=True, transform_input=False, **kwargs):
         super(Inception3, self).__init__()
 
         if self.training and aux_logits == False:
@@ -41,11 +41,11 @@ class Inception3(nn.Module):
         self.Mixed_6d = InceptionC(768, channels_7x7=160)
         self.Mixed_6e = InceptionC(768, channels_7x7=192)
         if aux_logits:
-            self.AuxLogits = InceptionAux(768, output_channels)
+            self.AuxLogits = InceptionAux(768, num_classes)
         self.Mixed_7a = InceptionD(768)
         self.Mixed_7b = InceptionE(1280)
         self.Mixed_7c = InceptionE(2048)
-        self.fc = nn.Linear(2048, output_channels)
+        self.fc = nn.Linear(2048, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
