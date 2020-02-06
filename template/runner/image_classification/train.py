@@ -33,7 +33,7 @@ class ImageClassificationTrain(BaseRoutine):
         output = model(input)
 
         # Unpack the target
-        target = target['class']
+        target = target['category_id']
 
         # Compute and record the loss
         loss = criterion(output, target)

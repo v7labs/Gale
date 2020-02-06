@@ -46,13 +46,13 @@ class AlexNet(nn.Module):
     """
     expected_input_size = (227, 227)
 
-    def __init__(self, output_channels, **kwargs):
+    def __init__(self, num_classes, **kwargs):
         """
         Creates an AlexNet model from the scratch.
 
         Parameters
         ----------
-        output_channels : int
+        num_classes : int
             Number of neurons in the last layer
         """
         super(AlexNet, self).__init__()
@@ -79,7 +79,7 @@ class AlexNet(nn.Module):
             nn.Dropout(),
             nn.Linear(4096, 4096),
             nn.ReLU(inplace=True),
-            nn.Linear(4096, output_channels),
+            nn.Linear(4096, num_classes),
         )
 
         # This is an alternative model definition which enables a deeper inspection of the model trough the debugger.

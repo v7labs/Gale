@@ -5,10 +5,10 @@ There are a lot of parameter which can be specified to modify the behaviour and 
 instead of hard-coding stuff.
 """
 # Utils
-import logging
-import os
 import base64
 import io
+import logging
+import os
 
 # Delegated
 import torch
@@ -17,7 +17,8 @@ from PIL import Image
 from template.runner.base import AbstractRunner
 from template.runner.base.base_routine import BaseRoutine
 from template.runner.base.base_setup import BaseSetup
-from util.misc import pil_loader
+import util.transforms as T
+from util.misc import pil_loader, convert_to_rgb
 
 
 class BaseInference(AbstractRunner):
@@ -46,18 +47,39 @@ class BaseInference(AbstractRunner):
         # Load the model if it does not exist yet
         if not hasattr(self, 'model') or not hasattr(self, 'transform'):
             self.model = self.setup.setup_model(**kwargs)
+            self.model.eval()
             checkpoint = self._load_checkpoint(**kwargs)
-            self.transform = checkpoint['test_transform']
+            if 'test_transform' in checkpoint:
+                self.transform = checkpoint['test_transform']
+            else:
+                logging.info("Test transform not found in checkpoint. Using ToTensor().")
+                self.transform = T.Compose([T.ToTensor()])
+
             self.classes = checkpoint['classes']
 
-        if not pre_load:
-            # Load and preprocess the data
-            img = self.preprocess(**kwargs)
+        if pre_load:
+            # Check no images to process are given
+            assert kwargs['input_image'] is None
+            assert kwargs['input_folder'] is None
+            # Create a fake empty image to process
+            buffered = io.BytesIO()
+            Image.new('RGB', (128, 128)).save(buffered, format="PNG")
+            kwargs['input_image'] = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-            # Forward Pass
+        # Load and preprocess the data
+        img = self.preprocess(**kwargs)
+
+        # Forward Pass
+        with torch.no_grad():
             output = self.model(img)
 
-            # Return postprocessed output
+        if pre_load:
+            # Return a standard answer
+            payload = {'result': "successfully loaded the model"}
+            logging.info(f"Returning payload: {payload}")
+            return payload
+        else:
+            # Return post-processed output
             return self.postprocess(output, **kwargs)
 
     ####################################################################################################################
@@ -77,7 +99,7 @@ class BaseInference(AbstractRunner):
         -------
             A dictionary containing the loaded checkpoint
         """
-        return torch.load(load_model)
+        return torch.load(load_model, map_location='cpu')
 
     def preprocess(self, input_folder, input_image, **kwargs):
         """Load and prepares the data to be fed to the neural network
@@ -101,6 +123,7 @@ class BaseInference(AbstractRunner):
         if input_image is not None:
             assert input_folder is None
             img = Image.open(io.BytesIO(base64.decodebytes(input_image.encode("utf-8"))))
+            img = convert_to_rgb(img)
 
         # Transform it
         img = self.transform(img)
@@ -113,7 +136,7 @@ class BaseInference(AbstractRunner):
     def _load_image(self, input_folder):
         """Load the image from the file system"""
         if not os.path.exists(input_folder):
-            raise FileNotFoundError
+            raise FileNotFoundError(f"Could not find file {input_folder}")
         img = pil_loader(input_folder)
         return img
 

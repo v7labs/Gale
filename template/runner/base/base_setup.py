@@ -1,28 +1,27 @@
 # Utils
-import glob
 import inspect
 import logging
 import os
-import sys
+# Torch related stuff
+import shutil
 from abc import abstractmethod
-from random import shuffle, sample
+from pathlib import Path
+from torch.hub import load_state_dict_from_url
 
 import numpy as np
 import pandas as pd
-
-# Torch related stuff
-import shutil
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim
 import torch.utils.data
 
-# DeepDIVA
-import yaml
-
 import models
+from models import model_zoo
 from datasets.util.dataset_integrity import verify_dataset_integrity
+
+
+# DeepDIVA
 
 
 class BaseSetup:
@@ -36,10 +35,10 @@ class BaseSetup:
     design pattern will be broken!
     """
 
-    ####################################################################################################################
+    ################################################################################################
     # General setup: model, optimizer, lr scheduler and criterion
     @classmethod
-    def setup_model(cls, model_name, no_cuda, num_classes=None, load_model=None, strict=True, **kwargs):
+    def setup_model(cls, model_name, no_cuda, num_classes=None, load_model=None, **kwargs):
         """Setup the model, load and move to GPU if necessary
 
         Parameters
@@ -52,8 +51,6 @@ class BaseSetup:
             How many different classes there are in our problem. Used for loading the model.
         load_model : string
             Path to a saved model
-        stric : bool
-            Enforces key match between loaded state_dict and model definition
 
         Returns
         -------
@@ -62,20 +59,66 @@ class BaseSetup:
         """
         # Load saved model dictionary
         if load_model:
+            state_dict = None
             if not os.path.isfile(load_model):
-                logging.error("No model dict found at '{}'".format(load_model))
-                raise SystemExit
-            logging.info('Loading a saved model')
-            checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage.cuda())
-            if 'model_name' in checkpoint:
-                model_name = checkpoint['model_name']
-            # Override the number of classes based on the size of the last layer in the dictionary
-            if num_classes is None or type(num_classes) == int:
-                num_classes = next(reversed(checkpoint['state_dict'].values())).shape[0]
+                # If it is not a valid path it will try to get the checkpoint
+                # from the model zoo
+                model_key = model_name + "_" + load_model
+                if model_key not in model_zoo:
+                    logging.error(f"No model dict found at '{load_model}'")
+                    raise SystemExit
+                load_model = model_zoo[model_key]
+            logging.info(f"Loading a model from {load_model}")
+            if load_model.startswith("http"):
+                state_dict = load_state_dict_from_url(load_model, progress=False)
+            else:
+                checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage)
+                # Check consistency with model_name
+                if 'model_name' in checkpoint:
+                    if model_name is None:
+                        model_name = checkpoint["model_name"]
+                    elif model_name != checkpoint["model_name"]:
+                        raise ValueError(f"name of the model in checkpoint does not match with --model-name. "
+                                         f"{checkpoint['model_name']} != {model_name}")
+                # Override the number of classes based on the list of classes in
+                # the checkpoint
+                if num_classes is None:
+                    num_classes = len(checkpoint["classes"])
+                elif not isinstance(checkpoint["classes"], dict) and num_classes != len(checkpoint["classes"]):
+                    raise ValueError(f"number of classes in checkpoint does not match with --num-classes. "
+                                     f"{len(checkpoint['classes'])} != {num_classes}")
+
+                if "state_dict" in checkpoint:
+                    state_dict = checkpoint["state_dict"]
+                elif "model" in checkpoint:  # Clicker legacy. Eventually should be removed
+                    state_dict = checkpoint["model"]
+                else:
+                    raise AttributeError(f"Could not find state dictionary in checkpoint {load_model}")
+
+            assert state_dict is not None, f"Could not load a state dictionary from {load_model}"
 
         # Initialize the model
         logging.info('Setting up model {}'.format(model_name))
-        model = models.__dict__[model_name](output_channels=num_classes, **kwargs)
+        # For all arguments declared in the constructor signature of the
+        # selected model
+        args = {}
+        for p in inspect.getfullargspec(models.__dict__[model_name]).args:
+            # Add it to a dictionary in case it exists a corresponding value in kwargs
+            if p in kwargs:
+                args.update({p: kwargs[p]})
+        args["num_classes"] = num_classes
+        model = models.__dict__[model_name](**args)
+        
+        # Check for module.* name space
+        if load_model:
+            # When its trained on GPU modules will have 'module' in their name
+            is_module_named = np.any([k.startswith('module') for k in state_dict.keys() if k])
+            # Load saved model weights without module naming
+            if not is_module_named:
+                try:
+                    model.load_state_dict(state_dict)
+                except Exception as exp:
+                    logging.warning(exp)
 
         # Transfer model to GPU
         if not no_cuda:
@@ -83,10 +126,10 @@ class BaseSetup:
             model = torch.nn.DataParallel(model).cuda()
             cudnn.benchmark = True
 
-        # Load saved model weights
-        if load_model:
+        # Load saved model weights with module naming
+        if load_model and is_module_named:
             try:
-                model.load_state_dict(checkpoint['state_dict'], strict=strict)
+                model.load_state_dict(state_dict)
             except Exception as exp:
                 logging.warning(exp)
 
@@ -115,14 +158,16 @@ class BaseSetup:
         # Verify the optimizer exists
         assert optimizer_name in torch.optim.__dict__
 
-        params = {}
+        params = [p for p in model.parameters() if p.requires_grad]
+
+        args = {}
         # For all arguments declared in the constructor signature of the selected optimizer
         for p in inspect.getfullargspec(torch.optim.__dict__[optimizer_name].__init__).args:
             # Add it to a dictionary in case it exists a corresponding value in kwargs
             if p in kwargs:
-                params.update({p: kwargs[p]})
-        # Create an return the optimizer with the correct list of parameters
-        return torch.optim.__dict__[optimizer_name](model.parameters(), **params)
+                args.update({p: kwargs[p]})
+
+        return torch.optim.__dict__[optimizer_name](params, **args)
 
     @classmethod
     def get_lrscheduler(cls, lrscheduler_name, **kwargs):
@@ -151,7 +196,7 @@ class BaseSetup:
             # Add it to a dictionary in case it exists a corresponding value in kwargs
             if p in kwargs:
                 params.update({p: kwargs[p]})
-        # Create an return the optimizer with the correct list of parameters
+        # Create and return the optimizer with the correct list of parameters
         return torch.optim.lr_scheduler.__dict__[lrscheduler_name](**params)
 
     @classmethod
@@ -192,50 +237,19 @@ class BaseSetup:
                 logging.info('Loading weights for data balancing')
                 weights = cls.load_class_weights_from_file(**kwargs)
                 criterion.weight = torch.from_numpy(weights).type(torch.FloatTensor)
-            except:
+            except Exception:
                 logging.warning('Unable to load information for data balancing. Using normal criterion')
 
         if not no_cuda:
             criterion.cuda()
         return criterion
 
-    ####################################################################################################################
+    ################################################################################################
     # Analytics handling
     @classmethod
-    def _load_analytics_csv(cls, input_folder, **kwargs):
-        """ Load the analytics.csv file. If it is missing, attempt creating it
-
-        Parameters
-        ----------
-        input_folder : string
-            Path string that points to the three folder train/val/test. Example: ~/../../data/svhn
-
-        Returns
-        -------
-        file
-            The csv file
+    def create_analytics_csv(cls, input_folder, darwin_dataset, train_ds, **kwargs):
         """
-        # If analytics.csv file not present, run the analytics on the dataset
-        if not os.path.exists(os.path.join(input_folder, "analytics.csv")):
-            logging.warning('Missing analytics.csv file for dataset located at {}'.format(input_folder))
-            try:
-                logging.warning('Attempt creating analytics.csv file for dataset located at {}'.format(input_folder))
-                cls.create_analytics_csv(input_folder=input_folder, **kwargs)
-                logging.warning('Created analytics.csv file for dataset located at {} '.format(input_folder))
-            except NotImplementedError:
-                logging.error('The method create_analytics_csv() is not implemented.')
-                sys.exit(-1)
-            except:
-                logging.error('Creation of analytics.csv failed.')
-                raise SystemError
-        # Loads the analytics csv
-        return pd.read_csv(os.path.join(input_folder, "analytics.csv"), header=None)
-
-    @classmethod
-    @abstractmethod
-    def create_analytics_csv(cls, input_folder, **kwargs):
-        """
-        Create the analytics.csv file at the location specified by dataset_folder
+        Creates the analytics.csv file at the location specified by input_folder
 
         Format of the file:
             file name: analytics.csv
@@ -247,22 +261,98 @@ class BaseSetup:
 
         Parameters
         ----------
-        input_folder : string
+        input_folder : str
             Path string that points to the dataset location
+        darwin_dataset : bool
+            Flag for using the darwin dataset class instead
+        train_ds : data.Dataset
+            Train split dataset
+        """
+        # If it already exists your job is done
+        if (Path(input_folder) / "analytics.csv").is_file():
+            return
+
+        logging.warning(f'Missing analytics.csv file for dataset located at {input_folder}')
+        logging.warning(f'Attempt creating analytics.csv file')
+
+        # Measure mean and std on train images
+        logging.info(f'Measuring mean and std on train images')
+        if darwin_dataset:
+            mean, std = train_ds.measure_mean_std()
+        else:
+            mean, std = cls._measure_mean_std(
+                input_folder=input_folder, train_ds=train_ds, **kwargs
+            )
+
+        # Measure weights for class balancing
+        logging.info(f'Measuring class wrights')
+        if darwin_dataset:
+            class_weights = train_ds.measure_weights()
+        else:
+            class_weights = cls._measure_weights(
+                input_folder=input_folder, train_ds=train_ds, **kwargs
+            )
+
+        # Save results as CSV file in the dataset folder
+        logging.info(f'Saving to analytics.csv')
+        df = pd.DataFrame([mean, std, class_weights])
+        df.index = ['mean[RGB]', 'std[RGB]', 'class_weights[num_classes]']
+        df.to_csv(Path(input_folder) / 'analytics.csv', header=False)
+        logging.warning(f'Created analytics.csv file for dataset located at {input_folder}')
+
+    @classmethod
+    def _measure_mean_std(cls, train_ds, **kwargs):
+        """Computes mean and std of train images, given the train loader
+
+        Parameters
+        ----------
+        train_ds : data.Dataset
+            Train split dataset
+
+        Returns
+        -------
+        mean : ndarray[double]
+            Mean value (for each channel) of all pixels of the images in the input folder
+        std : ndarray[double]
+            Standard deviation (for each channel) of all pixels of the images in the input folder
         """
         raise NotImplementedError
 
     @classmethod
-    def load_mean_std_from_file(cls, **kwargs):
+    def _measure_weights(cls, train_ds, **kwargs):
+        """Computes the class balancing weights (not the frequencies!!) given the train loader
+
+        Parameters
+        ----------
+        train_ds : data.Dataset
+            Train split dataset
+
+        Returns
+        -------
+        class_weights : ndarray[double]
+            Weight for each class in the train set (one for each class)
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def load_mean_std_from_file(cls, input_folder, **kwargs):
         """ Recover mean and std from the analytics.csv file
+
+        Parameters
+        ----------
+        input_folder : str
+            Path string that points to the three folder train/val/test. Example: ~/../../data/svhn
 
         Returns
         -------
         ndarray[double], ndarray[double]
             Mean and Std of the selected dataset, contained in the analytics.csv file.
         """
-        # Loads the analytics csv and extract mean and std
-        csv_file = cls._load_analytics_csv(**kwargs)
+        # Loads the analytics csv
+        if not (Path(input_folder) / "analytics.csv").exists():
+            raise SystemError(f"Analytics file not found in '{input_folder}'")
+        csv_file = pd.read_csv(Path(input_folder) / "analytics.csv", header=None)
+        # Extract mean and std
         for row in csv_file.values:
             if 'mean' in str(row[0]).lower():
                 mean = np.array(row[1:4], dtype=float)
@@ -274,16 +364,24 @@ class BaseSetup:
         return mean, std
 
     @classmethod
-    def load_class_weights_from_file(cls, **kwargs):
+    def load_class_weights_from_file(cls, input_folder, **kwargs):
         """ Recover class weights from the analytics.csv file (weights are the inverse of frequency)
+
+        Parameters
+        ----------
+        input_folder : str
+            Path string that points to the three folder train/val/test. Example: ~/../../data/svhn
 
         Returns
         -------
         ndarray[double]
             Class weights for the selected dataset, contained in the analytics.csv file.
         """
-        # Loads the analytics csv and extract mean and std
-        csv_file = cls._load_analytics_csv(**kwargs)
+        # Loads the analytics csv
+        if not (Path(input_folder) / "analytics.csv").exists():
+            raise SystemError(f"Analytics file not found in '{input_folder}'")
+        csv_file = pd.read_csv(Path(input_folder) / "analytics.csv", header=None)
+        # Extracts the weights
         for row in csv_file.values:
             if 'weights' in str(row[0]).lower():
                 weights = np.array([x for x in row[1:] if str(x) != 'nan'], dtype=float)
@@ -292,7 +390,7 @@ class BaseSetup:
             raise EOFError
         return weights
 
-    ####################################################################################################################
+    ################################################################################################
     # Dataloaders handling
     @classmethod
     def set_up_dataloaders(cls, **kwargs):
@@ -314,6 +412,9 @@ class BaseSetup:
 
         # Load the datasets
         train_ds, val_ds, test_ds = cls._get_datasets(**kwargs)
+
+        # Create the analytics csv
+        cls.create_analytics_csv(train_ds=train_ds, **kwargs)
 
         # Setup transforms
         logging.info('Setting up transforms')
@@ -350,8 +451,7 @@ class BaseSetup:
             Train, validation and test splits
         """
         if darwin_dataset:
-            # Split the data into train/val/test folders
-            cls.split_darwin_dataset(input_folder=input_folder, **kwargs)
+            return cls.get_darwin_datasets(input_folder=input_folder, **kwargs)
 
         if not os.path.isdir(input_folder):
             raise RuntimeError("Dataset folder not found at " + input_folder)
@@ -374,69 +474,47 @@ class BaseSetup:
         return train_ds, val_ds, test_ds
 
     @classmethod
-    def split_darwin_dataset(cls, input_folder, darwin_splits, current_log_folder, **kwargs):
-        """Splits a GUST-Elixir datasets downloaded into train/val/test with symlinks
-
-        RANDOM SPLITTING
+    def get_darwin_datasets(cls, input_folder: Path, split_folder: Path, split_type: str, **kwargs):
+        """
+        Used darwin-py integration to loads the dataset from file system and provide
+        the dataset splits for train validation and test
 
         Parameters
         ----------
-        input_folder : str
-            Path to the dataset on the file System
-        darwin_splits : list(float)
-            Specifies the % of the train/val/test splits
-        current_log_folder : string
-            Path to where logs/checkpoints are saved
+        input_folder : Path
+            Path string that points to the dataset location
+        split_folder : Path
+            Path to the folder containing the split txt files
+        split_type : str
+            Type of the split txt file to choose. Either ['random', 'tags', 'polygon']
+
+        Returns
+        -------
+        train_ds : data.Dataset
+        val_ds : data.Dataset
+        test_ds : data.Dataset
+            Train, validation and test splits
         """
-        # Load annotations and images file names
-        annotations_path = os.path.join(input_folder, 'annotations')
-        assert os.path.exists(annotations_path)
-        annotations_file_names = np.asarray(glob.glob(annotations_path + '/*.json'))
-        images_path = os.path.join(input_folder, 'images')
-        assert os.path.exists(images_path)
-        images_file_names = np.asarray([f for ext in ['jpg', 'jpeg', 'png'] for f in glob.glob(images_path + '/*.' + ext)])
-        assert len(annotations_file_names) == len(images_file_names)
+        assert input_folder is not None
+        input_folder = Path(input_folder)
+        assert input_folder.exists()
+        # Point to the full path split folder
+        assert split_folder is not None
+        split_folder = input_folder / "lists" / split_folder
+        assert split_folder.exists()
 
-        # Create a set of indexes and split it into sub-sets
-        indexes = set(range(0, len(images_file_names)))
-        assert np.sum(darwin_splits) == 100
-        splits = {k: int(np.round(len(indexes) * v / 100.0)) for k, v in zip(['train', 'val', 'test'], darwin_splits)}
-        for n, size in splits.items():
-            s = sample(indexes, size)
-            splits[n] = np.asarray(s)
-            indexes.difference_update(set(s))
-        assert len(indexes) == 0
-        assert np.sum([len(v) for v in splits.values()]) == len(images_file_names)
-
-        # Slice the filenames according to the indexes
-        annotations = {}
-        images = {}
-        for s, idx in splits.items():
-            annotations[s] = annotations_file_names[idx]
-            images[s] = images_file_names[idx]
-
-        # Split annotations with symlinks
-        def _split_with_symlinks(d, sub_folder):
-            for split_name, file_names in d.items():
-                # Create the folder
-                path = os.path.join(input_folder, split_name, sub_folder)
-                if not os.path.exists(path):
-                    os.makedirs(path)
-                # Make symlinks for all files
-                for f in file_names:
-                    dst = os.path.join(path, os.path.basename(f))
-                    if os.path.exists(dst):
-                        os.remove(dst)
-                    os.symlink(f, dst)
-        _split_with_symlinks(annotations, 'annotations')
-        _split_with_symlinks(images, 'images')
-
-        # Log the splits
-        with open(os.path.join(current_log_folder, "splits.yaml"), "w") as stream:
-            log = {}
-            for s, i in images.items():
-                log[s] = [os.path.basename(f) for f in i]
-            yaml.dump(log, stream)
+        # Select classification datasets
+        from darwin.torch.dataset import Dataset
+        train_ds = Dataset(
+            root=input_folder, split=split_folder / (split_type + "_train.txt")
+        )
+        val_ds = Dataset(
+            root=input_folder, split=split_folder / (split_type + "_val.txt")
+        )
+        test_ds = Dataset(
+            root=input_folder, split=split_folder / (split_type + "_test.txt")
+        )
+        return train_ds, val_ds, test_ds
 
     @classmethod
     def get_split(cls, split_folder, **kwargs):
@@ -481,19 +559,16 @@ class BaseSetup:
         train_loader = torch.utils.data.DataLoader(train_ds,
                                                    shuffle=True,
                                                    batch_size=batch_size,
-                                                   num_workers=workers,
-                                                   pin_memory=True)
+                                                   num_workers=workers)
         val_loader = torch.utils.data.DataLoader(val_ds,
                                                  batch_size=batch_size,
-                                                 num_workers=workers,
-                                                 pin_memory=True)
+                                                 num_workers=workers)
         test_loader = torch.utils.data.DataLoader(test_ds,
                                                   batch_size=batch_size,
-                                                  num_workers=workers,
-                                                  pin_memory=True)
+                                                  num_workers=workers)
         return train_loader, val_loader, test_loader
 
-    ####################################################################################################################
+    ################################################################################################
     # Transforms handling
     @classmethod
     def set_up_transforms(cls, train_ds, val_ds, test_ds, **kwargs):
@@ -501,9 +576,11 @@ class BaseSetup:
         # Assign the transform to splits
         train_ds.transform = cls.get_train_transform(**kwargs)
         for ds in [val_ds, test_ds]:
-            ds.transform = cls.get_test_transform(**kwargs)
+            if ds is not None:
+                ds.transform = cls.get_test_transform(**kwargs)
         for ds in [train_ds, val_ds, test_ds]:
-            ds.target_transform = cls.get_target_transform(**kwargs)
+            if ds is not None:
+                ds.target_transform = cls.get_target_transform(**kwargs)
 
     @classmethod
     @abstractmethod
@@ -523,7 +600,7 @@ class BaseSetup:
         """Set up the target transform for all splits"""
         raise NotImplementedError
 
-    ####################################################################################################################
+    ################################################################################################
     # Checkpointing handling
     @classmethod
     def checkpoint(cls, epoch, new_value, best_value, log_dir, the_lower_the_better=None, checkpoint_all_epochs=False, **kwargs):
@@ -606,15 +683,20 @@ class BaseSetup:
             classes = None
         try:
             expected_input_size = model.module.expected_input_size
-        except:
+        except Exception:
             expected_input_size = None
+
+        if isinstance(model, torch.nn.DataParallel):
+            state_dict = model.module.state_dict()
+        else:
+            state_dict = model.state_dict()
 
         d = {
             'epoch': epoch + 1,
             'arch': str(type(model)),
             'expected_input_size': expected_input_size,
             'model_name': model_name,
-            'state_dict': model.state_dict(),
+            'state_dict': state_dict,
             'best_value': best_value,
             'classes': classes,
             'train_transform': train_transform,
@@ -664,7 +746,7 @@ class BaseSetup:
             raise SystemExit
         return best_value
 
-    ####################################################################################################################
+    ################################################################################################
     # Learning rate handling
     @classmethod
     def warmup_lr_scheduler(cls, optimizer, warmup_iters, warmup_factor):

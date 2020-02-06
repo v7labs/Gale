@@ -81,11 +81,30 @@ def make_folder_if_not_exists(path):
         os.makedirs(path)
 
 
-def pil_loader(path):
-    # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
-    with open(path, 'rb') as f:
-        with Image.open(f) as img:
-            return img.convert('RGB')
+def pil_loader(path, to_rgb=True):
+    pic = Image.open(path)
+    if to_rgb:
+        pic = convert_to_rgb(pic)
+    return pic
+
+
+def convert_to_rgb(pic):
+    if pic.mode == "RGB":
+        pass
+    elif pic.mode in ("CMYK", "RGBA", "P"):
+        pic = pic.convert('RGB')
+    elif pic.mode == "I":
+        img = (np.divide(np.array(pic, np.int32), 2**16-1)*255).astype(np.uint8)
+        pic = Image.fromarray(np.stack((img, img, img), axis=2))
+    elif pic.mode == "I;16":
+        img = (np.divide(np.array(pic, np.int16), 2**8-1)*255).astype(np.uint8)
+        pic = Image.fromarray(np.stack((img, img, img), axis=2))
+    elif pic.mode == "L":
+        img = np.array(pic).astype(np.uint8)
+        pic = Image.fromarray(np.stack((img, img, img), axis=2))
+    else:
+        raise TypeError(f"unsupported image type {pic.mode}")
+    return pic
 
 
 def _is_pil_image(img):

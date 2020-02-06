@@ -35,13 +35,13 @@ class CNN_basic(nn.Module):
     """
     expected_input_size = (32, 32)
 
-    def __init__(self, output_channels, input_channels=3, **kwargs):
+    def __init__(self, num_classes, input_channels=3, **kwargs):
         """
         Creates an CNN_basic model from the scratch.
 
         Parameters
         ----------
-        output_channels : int
+        num_classes : int
             Number of neurons in the last layer
         input_channels : int
             Dimensionality of the input, typically 3 for RGB
@@ -67,7 +67,7 @@ class CNN_basic(nn.Module):
         # Classification layer
         self.fc = nn.Sequential(
             Flatten(),
-            nn.Linear(288, output_channels)
+            nn.Linear(288, num_classes)
         )
 
     def forward(self, x):

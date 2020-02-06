@@ -1,4 +1,4 @@
-# DeepV7 (Adapted fork of DeepDIVA: A Highly-Functional Python Framework for Reproducible Experiments)
+# Gale (Adapted fork of DeepDIVA: A Highly-Functional Python Framework for Reproducible Experiments)
 
 DeepDIVA is an infrastructure designed to enable quick and intuitive
 setup of reproducible experiments with a large range of useful analysis

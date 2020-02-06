@@ -71,12 +71,8 @@ class RunMe:
 
         Returns
         -------
-        train_scores : ndarray[floats] of size (1, `epochs`) or None
-            Score values for train split
-        val_scores : ndarray[floats] of size (1, `epochs`+1) or None
-            Score values for validation split
-        test_scores : float or None
-            Score value for test split
+        _ : dict
+        A dictionary which contains the payload of the runner class
         """
         # Parse all command line arguments
         args, cls.parser = cls._parse_arguments(args)
@@ -262,6 +258,9 @@ class RunMe:
             for c in class_name.__subclasses__():
                 csc = csc.union(get_all_concrete_subclasses(c))
             return csc
+
+        # Set up execution environment. Specify CUDA_VISIBLE_DEVICES and seeds
+        cls._set_up_env(**kwargs)
 
         # Find all subclasses of AbstractRunner and BaseRunner and select the chosen one among them based on -rc
         sub_classes = get_all_concrete_subclasses(AbstractRunner)
@@ -489,7 +488,9 @@ class RunMe:
             if group.title not in ['GENERAL', 'DATA']:
                 for action in group._group_actions:
                     if (kwargs[action.dest] is not None) and (
-                            kwargs[action.dest] != action.default) and action.dest != 'load_model' and action.dest != 'input_image' :
+                            kwargs[action.dest] != action.default) \
+                            and action.dest != 'load_model' \
+                            and action.dest != 'input_image':
                         non_default_parameters.append(str(action.dest) + "=" + str(kwargs[action.dest]))
 
         # Build up final logging folder tree with the non-default training parameters
@@ -632,7 +633,7 @@ class RunMe:
         else:
             try:
                 assert multi_run is None
-            except:
+            except Exception:
                 logging.error('Arguments for seed AND multi-run should not be active at the same time!')
                 raise SystemExit
 
