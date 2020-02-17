@@ -7,14 +7,14 @@ from models.registry import Model
 
 
 class GCN(torch.nn.Module):
-    def __init__(self, num_features, output_channels, num_layers=3, hidden=128, **kwargs):
+    def __init__(self, num_features, output_channels, num_layers=3, nb_neurons=128, **kwargs):
         super(GCN, self).__init__()
-        self.conv1 = GCNConv(num_features, hidden)
+        self.conv1 = GCNConv(num_features, nb_neurons)
         self.convs = torch.nn.ModuleList()
         for i in range(num_layers - 1):
-            self.convs.append(GCNConv(hidden, hidden))
-        self.lin1 = Linear(hidden, hidden)
-        self.lin2 = Linear(hidden, output_channels)
+            self.convs.append(GCNConv(nb_neurons, nb_neurons))
+        self.lin1 = Linear(nb_neurons, nb_neurons)
+        self.lin2 = Linear(nb_neurons, output_channels)
 
     def reset_parameters(self):
         self.conv1.reset_parameters()
@@ -23,12 +23,12 @@ class GCN(torch.nn.Module):
         self.lin1.reset_parameters()
         self.lin2.reset_parameters()
 
-    def forward(self, data):
+    def forward(self, data, target_size, **kwargs):
         x, edge_index, batch = data.x, data.edge_index, data.batch
         x = F.relu(self.conv1(x, edge_index))
         for conv in self.convs:
             x = F.relu(conv(x, edge_index))
-        x = global_mean_pool(x, batch)
+        x = global_mean_pool(x, batch, size=target_size)
         x = F.relu(self.lin1(x))
         x = F.dropout(x, p=0.5, training=self.training)
         x = self.lin2(x)
@@ -39,18 +39,18 @@ class GCN(torch.nn.Module):
 
 
 class GCNWithJK(torch.nn.Module):
-    def __init__(self, num_features, output_channels, num_layers=3, hidden=128, mode='cat', **kwargs):
+    def __init__(self, num_features, output_channels, num_layers=3, nb_neurons=128, mode='cat', **kwargs):
         super(GCNWithJK, self).__init__()
-        self.conv1 = GCNConv(num_features, hidden)
+        self.conv1 = GCNConv(num_features, nb_neurons)
         self.convs = torch.nn.ModuleList()
         for i in range(num_layers - 1):
-            self.convs.append(GCNConv(hidden, hidden))
+            self.convs.append(GCNConv(nb_neurons, nb_neurons))
         self.jump = JumpingKnowledge(mode)
         if mode == 'cat':
-            self.lin1 = Linear(num_layers * hidden, hidden)
+            self.lin1 = Linear(num_layers * nb_neurons, nb_neurons)
         else:
-            self.lin1 = Linear(hidden, hidden)
-        self.lin2 = Linear(hidden, output_channels)
+            self.lin1 = Linear(nb_neurons, nb_neurons)
+        self.lin2 = Linear(nb_neurons, output_channels)
 
     def reset_parameters(self):
         self.conv1.reset_parameters()

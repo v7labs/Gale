@@ -42,4 +42,8 @@ class GraphClassificationIamdbCLArguments(BaseCLArguments):
                                                  default=False,
                                                  action='store_true',
                                                  help='Node and edge features are not normalized (default: z-normalization)')
+        parser_graph_neural_network.add_argument('--nb-neurons',
+                                                 type=int,
+                                                 default=128,
+                                                 help='Number of hidden representations per graph convolution layer')
 

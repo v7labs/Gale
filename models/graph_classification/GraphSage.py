@@ -62,7 +62,7 @@ class GraphSAGEWithJK(torch.nn.Module):
         self.lin1.reset_parameters()
         self.lin2.reset_parameters()
 
-    def forward(self, data, size=target_size, **kwargs):
+    def forward(self, data, target_size, **kwargs):
         x, edge_index, batch = data.x, data.edge_index, data.batch
         x = F.relu(self.conv1(x, edge_index))
         xs = [x]
@@ -70,7 +70,7 @@ class GraphSAGEWithJK(torch.nn.Module):
             x = F.relu(conv(x, edge_index))
             xs += [x]
         x = self.jump(xs)
-        x = global_mean_pool(x, batch)
+        x = global_mean_pool(x, batch, size=target_size)
         x = F.relu(self.lin1(x))
         x = F.dropout(x, p=0.5, training=self.training)
         x = self.lin2(x)

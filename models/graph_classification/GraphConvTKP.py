@@ -8,7 +8,7 @@ from models.registry import Model
 
 
 class GraphConv3TPK(torch.nn.Module):
-    def __init__(self, num_features, output_channels, **kwargs):
+    def __init__(self, num_features, output_channels, nb_neurons=128, **kwargs):
         """
 
         Parameters
@@ -20,14 +20,14 @@ class GraphConv3TPK(torch.nn.Module):
         """
         super(GraphConv3TPK, self).__init__()
 
-        self.conv1 = GraphConv(num_features, 128)
-        self.pool1 = TopKPooling(128, ratio=0.8)
-        self.conv2 = GraphConv(128, 128)
-        self.pool2 = TopKPooling(128, ratio=0.8)
-        self.conv3 = GraphConv(128, 128)
-        self.pool3 = TopKPooling(128, ratio=0.8)
+        self.conv1 = GraphConv(num_features, nb_neurons)
+        self.pool1 = TopKPooling(nb_neurons, ratio=0.8)
+        self.conv2 = GraphConv(nb_neurons, nb_neurons)
+        self.pool2 = TopKPooling(nb_neurons, ratio=0.8)
+        self.conv3 = GraphConv(nb_neurons, nb_neurons)
+        self.pool3 = TopKPooling(nb_neurons, ratio=0.8)
 
-        self.lin1 = torch.nn.Linear(128, 64)
+        self.lin1 = torch.nn.Linear(nb_neurons, 64)
         self.lin2 = torch.nn.Linear(64, output_channels)
 
     def forward(self, data, target_size=None, **kwargs):
@@ -50,7 +50,7 @@ class GraphConv3TPK(torch.nn.Module):
 
 
 class GraphConv1TPK(torch.nn.Module):
-    def __init__(self, num_features, output_channels, **kwargs):
+    def __init__(self, num_features, output_channels, nb_neurons=128, **kwargs):
         """
 
         Parameters
@@ -62,12 +62,12 @@ class GraphConv1TPK(torch.nn.Module):
         """
         super(GraphConv1TPK, self).__init__()
 
-        self.conv1 = GraphConv(num_features, 128)
-        self.conv2 = GraphConv(128, 128)
-        self.pool = TopKPooling(128, ratio=0.8)
-        self.conv3 = GraphConv(128, 128)
+        self.conv1 = GraphConv(num_features, nb_neurons)
+        self.conv2 = GraphConv(nb_neurons, nb_neurons)
+        self.pool = TopKPooling(nb_neurons, ratio=0.8)
+        self.conv3 = GraphConv(nb_neurons, nb_neurons)
 
-        self.lin1 = torch.nn.Linear(128, 64)
+        self.lin1 = torch.nn.Linear(nb_neurons, 64)
         self.lin2 = torch.nn.Linear(64, output_channels)
 
     def forward(self, data, target_size=None, **kwargs):
@@ -86,7 +86,7 @@ class GraphConv1TPK(torch.nn.Module):
 
 
 class GraphConv0TPK(torch.nn.Module):
-    def __init__(self, num_features, output_channels, **kwargs):
+    def __init__(self, num_features, output_channels, nb_neurons=128, **kwargs):
         """
 
         Parameters
@@ -98,11 +98,11 @@ class GraphConv0TPK(torch.nn.Module):
         """
         super(GraphConv0TPK, self).__init__()
 
-        self.conv1 = GraphConv(num_features, 128)
-        self.conv2 = GraphConv(128, 128)
-        self.conv3 = GraphConv(128, 128)
+        self.conv1 = GraphConv(num_features, nb_neurons)
+        self.conv2 = GraphConv(nb_neurons, nb_neurons)
+        self.conv3 = GraphConv(nb_neurons, nb_neurons)
 
-        self.lin1 = torch.nn.Linear(128, 64)
+        self.lin1 = torch.nn.Linear(nb_neurons, 64)
         self.lin2 = torch.nn.Linear(64, output_channels)
 
     def forward(self, data, target_size=None, **kwargs):
@@ -139,5 +139,5 @@ def graphconv3TPK(num_features, output_channels, **kwargs):
     """
     Simple Graph Convolution Neural Network
     """
-    return GraphConv3TPK(num_features, output_channels)
+    return GraphConv3TPK(num_features, output_channels, **kwargs)
 

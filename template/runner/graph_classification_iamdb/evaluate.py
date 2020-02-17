@@ -61,7 +61,7 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
             Label for logging purposes. Typically 'train', 'test' or 'valid'.
             It's prepended to the logging output path and messages.
         """
-        #TODO: check if TB logging works for multi-class --> if yes correct in base_runner
+        #TODO: check if TB logging works for multi-run --> if yes correct in base_runner
         classes = data_loader.dataset.config['classes']
 
         # Make and log to TB the confusion matrix
