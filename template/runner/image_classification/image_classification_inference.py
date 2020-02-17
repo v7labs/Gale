@@ -7,4 +7,4 @@ class ImageClassificationInference(BaseInference):
 
     def __init__(self):
         super().__init__()
-        self.setup =  ImageClassificationSetup()
+        self.setup = ImageClassificationSetup()

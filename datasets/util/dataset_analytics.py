@@ -66,11 +66,11 @@ def _cms_online(file_names, workers):
     """
     logging.info('Begin computing the mean')
 
-    # TODO temporary fix as workaround against Pyrlang. As soon as Pylang is out of the game (@Andrea)
-    # TODO the old functionality with the Pool should be restores (@Michele)
+    # Set up a pool of workers
+    pool = Pool(workers+1)
 
     # Online mean
-    results = [_return_mean(f) for f in file_names]
+    results = pool.map(_return_mean, file_names)
     mean_sum = np.sum(np.array(results), axis=0)
 
     # Divide by number of samples in train set
@@ -80,38 +80,16 @@ def _cms_online(file_names, workers):
     logging.info('Begin computing the std')
 
     # Online image_classification deviation
-    results = [_return_std(f, mean) for f in file_names]
+    results = pool.starmap(_return_std, [[item, mean] for item in file_names])
     std_sum = np.sum(np.array([item[0] for item in results]), axis=0)
     total_pixel_count = np.sum(np.array([item[1] for item in results]))
     std = np.sqrt(std_sum / total_pixel_count)
     logging.info('Finished computing the std')
 
-    return mean, std
+    # Shut down the pool
+    pool.close()
 
-    # # Set up a pool of workers
-    # pool = Pool(workers+1)
-    #
-    # # Online mean
-    # results = pool.map(_return_mean, file_names)
-    # mean_sum = np.sum(np.array(results), axis=0)
-    #
-    # # Divide by number of samples in train set
-    # mean = mean_sum / file_names.size
-    #
-    # logging.info('Finished computing the mean')
-    # logging.info('Begin computing the std')
-    #
-    # # Online image_classification deviation
-    # results = pool.starmap(_return_std, [[item, mean] for item in file_names])
-    # std_sum = np.sum(np.array([item[0] for item in results]), axis=0)
-    # total_pixel_count = np.sum(np.array([item[1] for item in results]))
-    # std = np.sqrt(std_sum / total_pixel_count)
-    # logging.info('Finished computing the std')
-    #
-    # # Shut down the pool
-    # pool.close()
-    #
-    # return mean, std
+    return mean, std
 
 
 # Loads an image with OpenCV and returns the channel wise means of the image.
@@ -206,87 +184,6 @@ def get_class_weights(input_folder, workers, **kwargs):
 
     return class_weights
 
-
-
-# Eventually this code should be removed but it could still be useful in the next weeks so I postpone the removal
-#
-# def _get_class_frequencies_weights_coco(dataset, name_onehotindex, **kwargs):
-#     """
-#     Get the weights proportional to the inverse of their class frequencies.
-#     The vector sums up to 1
-#
-#     Parameters
-#     ----------
-#     dataset: pycocotools.coco.COCO
-#         COCO dataset loaded with the pycocotools and the torchvision dataset loader
-#
-#     classes: dict
-#         dictionary containing the class names and the corresponding index for argmax
-#
-#     Returns
-#     -------
-#     ndarray[double] of size (num_classes)
-#         The weights vector as a 1D array normalized (sum up to 1)
-#     """
-#     logging.info('Begin computing class frequencies weights')
-#
-#     count_labels = {v: 0 for v in name_onehotindex.values()}
-#
-#     for (_, gt_mask) in dataset:
-#         for k, v in zip(*np.unique(np.array(gt_mask).flatten(), return_counts=True)):
-#             count_labels[k] += v
-#
-#     total_num_samples = sum(count_labels.values())
-#     num_samples_per_class = np.array([count_labels[k] for k in sorted(count_labels.keys())])
-#     class_frequencies = (num_samples_per_class / total_num_samples)
-#     logging.info('Finished computing class frequencies weights')
-#     logging.info('Class frequencies (rounded): {class_frequencies}'
-#                  .format(class_frequencies=np.around(class_frequencies * 100, decimals=2)))
-#     # Normalize vector to sum up to 1.0 (in case the Loss function does not do it)
-#     return (1 / num_samples_per_class) / ((1 / num_samples_per_class).sum())
-#
-#
-# def _get_class_weights_multilabel(dataset_labels):
-#     """
-#     Computes the weights for each class (as required by torch.nn.BCEWithLogitsLoss).
-#     The weight for each class is #neg_samples/#pos_samples.
-#
-#     Parameters
-#     ----------
-#     dataset_folder: torch.utils.data.dataloader.DataLoader
-#         Path to a labels.csv file with labels for each training sample
-#
-#     Returns
-#     -------
-#     ndarray[double] of size (num_classes)
-#         The weights vector as a 1D array
-#     """
-#     logging.info('Begin computing class weights')
-#
-#     labels_df = pd.read_csv(dataset_labels)
-#     classes = labels_df.columns
-#     labels = labels_df.values
-#
-#     # Replace all -1 with 0
-#     labels[labels == -1] = 0
-#
-#     # Remove the filenames
-#     labels = labels[:, 1:]
-#
-#     weights = []
-#     for i in range(len(labels[0])):
-#         pos = len(np.where(labels[:, i] == 1)[0])
-#         neg = len(labels) - pos
-#         weight = neg / pos
-#         weights.append(weight)
-#
-#     weights = np.array(weights)
-#
-#     logging.info('Finished computing class weights')
-#     logging.info('Class weights (rounded): {}'.format(np.around(weights, decimals=2)))
-#     return weights
-#
-
 def compute_mean_std_graphs(dataset, **kwargs):
     """
     Computes mean and std of all node and edge features present in the given ParsedGxlDataset (see gxl_parser.py).
@@ -359,5 +256,3 @@ def get_class_weights_graphs(dataset, **kwargs):
     logging.info(f'Class weights (rounded): {np.around(class_weights * 100, decimals=2)}')
 
     return class_weights
-
-

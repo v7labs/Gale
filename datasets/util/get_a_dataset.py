@@ -10,8 +10,7 @@ import torch
 import torchvision
 import zipfile
 from PIL import Image
-from scipy.io import loadmat as _loadmat
-
+from pathlib import Path
 from datasets.util.dataset_splitter import split_dataset
 from util.misc import make_folder_if_not_exists
 
@@ -84,6 +83,8 @@ def svhn(args):
     -------
         None
     """
+    from scipy.io import loadmat as _loadmat
+
     # Use torchvision to download the dataset
     torchvision.datasets.SVHN(root=args.output_folder, split='train', download=True)
     torchvision.datasets.SVHN(root=args.output_folder, split='test', download=True)
@@ -140,6 +141,19 @@ def cifar10(output_folder, **kwargs):
     -------
         None
     """
+    # Make output folders
+    dataset_root = os.path.join(output_folder, 'CIFAR10')
+    train_folder = os.path.join(dataset_root, 'train')
+    test_folder = os.path.join(dataset_root, 'test')
+
+    if Path(dataset_root).exists():
+        print(f"Path ({dataset_root}) already exists. Nothing done")
+        return
+
+    make_folder_if_not_exists(dataset_root)
+    make_folder_if_not_exists(train_folder)
+    make_folder_if_not_exists(test_folder)
+
     # Use torchvision to download the dataset
     cifar_train = torchvision.datasets.CIFAR10(root=output_folder, train=True, download=True)
     cifar_test = torchvision.datasets.CIFAR10(root=output_folder, train=False, download=True)
@@ -154,15 +168,6 @@ def cifar10(output_folder, **kwargs):
                            5: 'dog', 6: 'frog', 7: 'horse', 8: 'ship', 9: 'truck'}
     train_labels = [class_names_mapping[l] for l in train_labels]
     test_labels = [class_names_mapping[l] for l in test_labels]
-
-    # Make output folders
-    dataset_root = os.path.join(output_folder, 'CIFAR10')
-    train_folder = os.path.join(dataset_root, 'train')
-    test_folder = os.path.join(dataset_root, 'test')
-
-    make_folder_if_not_exists(dataset_root)
-    make_folder_if_not_exists(train_folder)
-    make_folder_if_not_exists(test_folder)
 
     def _write_data_to_folder(arr, labels, folder):
         for i, (img, label) in enumerate(zip(arr, labels)):
