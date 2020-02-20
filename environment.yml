@@ -40,8 +40,8 @@ dependencies:
   - mkl_random=1.1.0=py38h962f231_0
   - ncurses=6.1=he6710b0_1
   - ninja=1.9.0=py38hfd86e86_0
-  - numpy=1.16.6=py38hbc911f0_0
-  - numpy-base=1.16.6=py38hde5b4d6_0
+  - numpy=1.18.1=py38h4f9e942_0
+  - numpy-base=1.18.1=py38hde5b4d6_1
   - olefile=0.46=py_0
   - openssl=1.1.1d=h7b6447c_4
   - pandas=1.0.1=py38h0573a6f_0
