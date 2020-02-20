@@ -106,5 +106,4 @@ dependencies:
     - wandb==0.8.27
     - watchdog==0.10.2
     - zipp==3.0.0
-prefix: /HOME/pondenka/.conda/envs/gale
 
