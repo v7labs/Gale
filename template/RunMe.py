@@ -207,6 +207,9 @@ class RunMe:
         runner_class = [c for c in sub_classes if to_capital_camel_case(runner_class).lower() == c.__name__.lower()]
         assert len(runner_class) == 1
         runner_class = runner_class[0]
+        # TODO: make this more elegant
+        # repack the runner_class with the reference for the actual runner, not as a string
+        unpacked_args['runner_class'] = runner_class
 
         logging.warning(f'Current working directory is: {os.getcwd()}')
 
@@ -313,11 +316,13 @@ class RunMe:
         # As many times as runs
         for i in range(multi_run):
             logging.info('Multi-Run: {} of {}'.format(i + 1, multi_run))
-            train_scores[i, :], val_scores[i, :], test_scores[i] = runner_class.single_run(run=i,
-                                                                                           current_log_folder=current_log_folder,
-                                                                                           multi_run=multi_run,
-                                                                                           epochs=epochs,
-                                                                                           **kwargs)
+            return_value = runner_class().single_run(run=i,
+                                                    current_log_folder=current_log_folder,
+                                                    multi_run=multi_run,
+                                                    epochs=epochs,
+                                                    **kwargs)
+            train_scores[i, :], val_scores[i, :], test_scores[i] = (return_value['train'], return_value['val'], return_value['test'])
+
 
             # Generate and add to tensorboard the shaded plot for train
             train_curve = plot_mean_std(arr=train_scores[:i + 1],
@@ -342,6 +347,9 @@ class RunMe:
         np.save(os.path.join(current_log_folder, 'train_values.npy'), train_scores)
         np.save(os.path.join(current_log_folder, 'val_values.npy'), val_scores)
         logging.info('Multi-run values for test-mean:{} test-std: {}'.format(np.mean(test_scores), np.std(test_scores)))
+        s = f'mean: {np.mean(test_scores)}\n\nstd: {np.std(test_scores)}'
+        TBWriter().add_text(tag='Performance average and std over {} runs\n'.format(multi_run),
+                            text_string=s)
 
         return train_scores, val_scores, test_scores
 
@@ -368,7 +376,8 @@ class RunMe:
             rdir = os.path.join(os.path.dirname(__file__), 'runner')
             packages_in_runner = [name for name in os.listdir(rdir) if os.path.isdir(os.path.join(rdir, name))]
             packages_in_runner.remove('base')
-            packages_in_runner.remove('__pycache__')
+            if '__pycache__' in packages_in_runner:
+                packages_in_runner.remove('__pycache__')
             return {n: c
                     for pkg in packages_in_runner
                     for n, c in inspect.getmembers(importlib.import_module('template.runner.' + pkg), inspect.isclass)
