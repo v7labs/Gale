@@ -574,11 +574,11 @@ class RunMe:
             None
         """
         # All file extensions to be saved by copy-code.
-        FILE_TYPES = ['.sh', '.py']
+        FILE_TYPES = ['.sh', '.py', '.yml', '.json', '.md', '.ipynb']
 
-        # Get DeepDIVA root
+        # Get Gale root
         cwd = os.getcwd()
-        dd_root = os.path.join(cwd.split('DeepDIVA')[0], 'DeepDIVA')
+        dd_root = os.path.join(cwd.split('gale')[0], 'gale')
 
         files = get_all_files_in_folders_and_subfolders(dd_root)
 
@@ -588,14 +588,14 @@ class RunMe:
         tmp_dir = tempfile.mkdtemp()
 
         for item in code_files:
-            dest = os.path.join(tmp_dir, 'DeepDIVA', item.split('DeepDIVA')[1][1:])
+            dest = os.path.join(tmp_dir, 'gale', item.split('gale')[1][1:])
             if not os.path.exists(os.path.dirname(dest)):
                 os.makedirs(os.path.dirname(dest))
             shutil.copy(item, dest)
 
         # TODO: make it save a zipfile instead of a tarfile.
-        with tarfile.open(os.path.join(output_folder, 'DeepV7.tar.gz'), 'w:gz') as tar:
-            tar.add(tmp_dir, arcname='DeepDIVA')
+        with tarfile.open(os.path.join(output_folder, 'gale.tar.gz'), 'w:gz') as tar:
+            tar.add(tmp_dir, arcname='gale')
 
         # Clean up all temporary files
         shutil.rmtree(tmp_dir)
