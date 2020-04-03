@@ -548,7 +548,8 @@ class RunMe:
 
         # Save all environment packages to logs_folder
         environment_yml = os.path.join(log_folder, 'environment.yml')
-        subprocess.call('conda env export > {}'.format(environment_yml), shell=True)
+        current_environment = os.environ['CONDA_DEFAULT_ENV']
+        subprocess.call(f'conda env export -n {current_environment} -f {environment_yml} --no-builds', shell=True)
 
         # Define Tensorboard SummaryWriter
         logging.info('Initialize Tensorboard SummaryWriter')
