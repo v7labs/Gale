@@ -48,7 +48,7 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
                           f_ind=input.file_name_ind.cpu().numpy())
 
     @classmethod
-    def end_of_the_epoch(cls, data_loader, epoch, logging_label, multi_run_label, current_log_folder=None, **kwargs):
+    def end_of_the_epoch(cls, data_loader, epoch, logging_label, multi_run_label="", current_log_folder=None, **kwargs):
         """See parent method for documentation
 
         Extra-Parameters
@@ -61,7 +61,6 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
             Label for logging purposes. Typically 'train', 'test' or 'valid'.
             It's prepended to the logging output path and messages.
         """
-        #TODO: check if TB logging works for multi-run --> if yes correct in base_runner
         classes = data_loader.dataset.config['classes']
 
         # Make and log to TB the confusion matrix
@@ -78,11 +77,11 @@ class GraphClassificationEvaluate(GraphClassificationTrain):
                             global_step=epoch)
 
         # only during testing
-        if current_log_folder:
+        if logging_label == 'test':
             multi_tag = ''
             if len(multi_run_label) > 0:
                 multi_tag = ' run{}'.format(multi_run_label)
-            # save the clasification output as a csv
+            # save the classification output as a csv
             MetricLogger()['classification_results{}'.format(multi_run_label)].save_csv(output_folder=current_log_folder, multi_run_label=multi_run_label)
             report = MetricLogger()['classification_results{}'.format(multi_run_label)].get_report()
             TBWriter().add_text(tag='Classification per test file {}\n'.format(multi_tag),

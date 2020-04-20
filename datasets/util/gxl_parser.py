@@ -405,7 +405,6 @@ class ParsedGxlGraph:
 
         return feature_names, features
 
-
     @staticmethod
     def verification(root, no_empty_graphs):
         """
@@ -471,7 +470,7 @@ class ParsedGxlGraph:
         end_points = [int(edge.attrib["to"].replace('_', '')) for edge in root.iter('edge')]
         assert len(start_points) == len(end_points)
 
-        # move enumeration start to 0
+        # move enumeration start to 0 if necessary
         if len(start_points) > 0 and len(end_points) > 0:
             if min(min(start_points, end_points)) > 0:
                 shift = min(min(start_points, end_points))
