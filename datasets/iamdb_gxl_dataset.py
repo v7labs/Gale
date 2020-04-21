@@ -47,7 +47,7 @@ class GxlDataset(InMemoryDataset):
         self.target_transform = None
         self.mean_std = mean_std
 
-        self.no_empty_graphs = no_empty_graphs
+        self.features_to_use = features_to_use  # TODO: implement
         self.root = root_path
         self.subset = subset
         self.use_position = remove_coordinates
@@ -59,20 +59,39 @@ class GxlDataset(InMemoryDataset):
             # delete the root/processed folder
             shutil.rmtree(processed_path)
 
-        # initiate the two dictionaries
-        self.categorical_features = self._setup_cat_feature_dict(categorical_features)
-        if features_to_use is not None:
-            assert type(features_to_use) == str
-            self.features_to_use = [item for item in features_to_use.split(',')]
-        else:
-            self.features_to_use = features_to_use
-
         self.name = os.path.basename(root_path)
 
         super(GxlDataset, self).__init__(self.root, transform, pre_transform)
 
         # split the dataset and the slices into three subsets
         self.data, self.slices, self.config = torch.load(self.processed_paths[0])
+
+    @property
+    def categorical_features(self, json_path) -> dict:
+        if json_path is None:
+            categorical_features = {'node': [], 'edge': []}
+        else:
+            # read the json file
+            logging.info('Loading categorical variables from JSON ({})'.format(json_path))
+            with open('strings.json') as f:
+                categorical_features = json.load(json_path)
+            # add missing keys
+            if 'edge' not in categorical_features:
+                categorical_features['edge'] = []
+            if 'node' not in categorical_features:
+                categorical_features['node'] = []
+        return categorical_features
+
+    @property
+    def features_to_use(self) -> list:
+        return self._features_to_use
+
+    @features_to_use.setter
+    def features_to_use(self, features_to_use):
+        if features_to_use is not None:
+            assert type(features_to_use) == str
+            features_to_use = [item for item in features_to_use.split(',')]
+        self._features_to_use = features_to_use
 
     @property
     def root(self):
@@ -174,21 +193,4 @@ class GxlDataset(InMemoryDataset):
         #     json.dump(config, fp)
 
         torch.save((data, slices, config), self.processed_paths[0])
-
-    @staticmethod
-    def _setup_cat_feature_dict(json_path):
-        if json_path is None:
-            dict = {'node': [], 'edge': []}
-        else:
-            # read the json file
-            logging.info('Loading categorical variables from JSON ({})'.format(json_path))
-            with open('strings.json') as f:
-                dict = json.load(json_path)
-            # add missing keys
-            if 'edge' not in dict:
-                dict['edge'] = []
-            if 'node' not in dict:
-                dict['node'] = []
-
-        return dict
 
