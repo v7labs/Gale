@@ -294,7 +294,7 @@ class GraphClassificationSetup(BaseSetup):
             logging.warning('Datasets will NOT be rebuilt!')
 
         train_ds = cls.get_split(root_path=data_dir, subset='train', rebuild_dataset=rebuild_dataset, **kwargs)
-        val_ds = cls.get_split(root_path=data_dir, subset='valid', rebuild_dataset=rebuild_dataset, **kwargs)
+        val_ds = cls.get_split(root_path=data_dir, subset='val', rebuild_dataset=rebuild_dataset, **kwargs)
         test_ds = cls.get_split(root_path=data_dir, subset='test', rebuild_dataset=rebuild_dataset, **kwargs)
 
         return train_ds, val_ds, test_ds

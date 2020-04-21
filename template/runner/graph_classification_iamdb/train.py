@@ -27,7 +27,7 @@ class GraphClassificationTrain(BaseRoutine):
         log_interval : int
             Interval limiting the logging of mini-batches.
         logging_label : string
-            Label for logging purposes. Typically 'train', 'test' or 'valid'.
+            Label for logging purposes. Typically 'train', 'test' or 'val'.
             It's prepended to the logging output path and messages.
         run : int
             Number of run, used in multi-run context to discriminate the different runs

@@ -27,10 +27,15 @@ class GraphClassificationIamdbCLArguments(BaseCLArguments):
                                                  default=None,
                                                  help='If true categorical feature values are loaded from file "categorical_features.json"'
                                                       ' in the input folder')
-        parser_graph_neural_network.add_argument('--disable-position',
+        parser_graph_neural_network.add_argument('--remove-coordinates',
                                                  default=False,
                                                  action='store_true',
-                                                 help='Set if node positions should not be used as a feature')
+                                                 help='Set if node positions should not be used as a feature (assumes the features are present'
+                                                      'as "x" and "y" in the gxl file)')
+        parser_graph_neural_network.add_argument('--center-coordinates',
+                                                 default=False,
+                                                 action='store_true',
+                                                 help='Set if the coordinates should be centred (xy - xy(avg))')
         parser_graph_neural_network.add_argument('--features-to-use',
                                                  type=str,
                                                  help='Specify features that should be used like "NodeFeatureName1,NodeFeatureName2,EdgefeatureName1"')

@@ -5,15 +5,16 @@ import shutil
 import json
 import logging
 import pandas as pd
+import sys
 
 from torch_geometric.data import InMemoryDataset, Data
-from datasets.util.gxl_parser import ParsedGxlDataset, normalize_graph
+from datasets.util.gxl_parser import ParsedGxlDataset
 
 
 class GxlDataset(InMemoryDataset):
     def __init__(self, root_path, transform=None, pre_transform=None, categorical_features=None, rebuild_dataset=True,
-                 subset='', disable_position=False, features_to_use=None, no_empty_graphs=False, mean_std=None,
-                 disable_feature_norm=False, **kwargs):
+                 subset='', remove_coordinates=False, features_to_use=None, no_empty_graphs=False, mean_std=None,
+                 disable_feature_norm=False, center_coordinates=False, **kwargs):
         """
         This class reads a IAM dataset in gxl format (tested for AIDS, Fingerprint, Letter)
 
@@ -22,7 +23,7 @@ class GxlDataset(InMemoryDataset):
         use_position
         root_path: str
             Path to the dataset folder. There has to be a sub-folder 'data' where the graph gxl files and the train.cxl,
-            valid.cxl and test.cxl files are.
+            val.cxl and test.cxl files are.
         transform:
         pre_transform:
         categorical_features : str
@@ -33,7 +34,7 @@ class GxlDataset(InMemoryDataset):
         rebuild_dataset: bool
             True if dataset should be re-processed
         subset: str
-            'valid', 'train' or 'test (or empty) --> name has to match the corresponding cxl file
+            'val', 'train' or 'test (or empty) --> name has to match the corresponding cxl file
         features_to_use: string
             comma delimited list of the attribute names (either node or edges) that should be used
             e.g. "symbol,valence"
@@ -49,8 +50,9 @@ class GxlDataset(InMemoryDataset):
         self.no_empty_graphs = no_empty_graphs
         self.root = root_path
         self.subset = subset
-        self.use_position = disable_position
+        self.use_position = remove_coordinates
         self.disable_feature_norm = disable_feature_norm
+        self.center_coordinates = center_coordinates
         # should we load the saved dataset from processed or should it be rebuilt
         processed_path = os.path.join(self.root, 'processed')
         if rebuild_dataset and os.path.exists(processed_path):
@@ -71,6 +73,17 @@ class GxlDataset(InMemoryDataset):
 
         # split the dataset and the slices into three subsets
         self.data, self.slices, self.config = torch.load(self.processed_paths[0])
+
+    @property
+    def root(self):
+        return self._root
+
+    @root.setter
+    def root(self, root_path):
+        if not os.path.isdir(root_path):
+            logging.error(f'Folder {root_path} does not exist.')
+            sys.exit(-1)
+        self._root = root_path
 
     @property
     def raw_file_names(self):
@@ -100,7 +113,7 @@ class GxlDataset(InMemoryDataset):
         Processes the dataset to the :obj:`self.processed_dir` folder.
         """
         gxl_dataset = ParsedGxlDataset(os.path.join(self.root, 'data'), self.categorical_features, subset=self.subset,
-                                       disable_position=self.use_position, features_to_use=self.features_to_use,
+                                       remove_coordinates=self.use_position, features_to_use=self.features_to_use,
                                        no_empty_graphs=self.no_empty_graphs)
 
         # make a csv with the number of nodes per graph
@@ -125,7 +138,7 @@ class GxlDataset(InMemoryDataset):
             # y (Tensor): Graph or node targets with arbitrary shape
 
             if not self.disable_feature_norm and self.mean_std is not None:
-                graph = normalize_graph(graph, self.mean_std)
+                graph.normalize(self.mean_std, self.center_coordinates)
             # node
             x = torch.tensor(graph.node_features, dtype=torch.float)
             pos = torch.tensor(graph.node_position, dtype=torch.float)

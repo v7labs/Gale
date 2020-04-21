@@ -57,7 +57,7 @@ class ImageClassificationEvaluate(ImageClassificationTrain):
         epoch : int
             Number of the epoch (for logging purposes).
         logging_label : string
-            Label for logging purposes. Typically 'train', 'test' or 'valid'.
+            Label for logging purposes. Typically 'train', 'test' or 'val'.
             It's prepended to the logging output path and messages.
         """
         # Make and log to TB the confusion matrix
