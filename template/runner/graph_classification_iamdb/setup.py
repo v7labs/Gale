@@ -4,6 +4,7 @@ import os
 import inspect
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 # torch
 import torchvision
@@ -22,10 +23,12 @@ class GraphClassificationSetup(BaseSetup):
     """
     Implementation of the setup methods for Graph Neural Networks and the IAMDB datasets.
     """
+
     ####################################################################################################################
     # General setup: model, optimizer, lr scheduler and criterion
     @classmethod
-    def setup_model(cls, model_name, no_cuda, num_classes=None, num_features=None, load_model=None, strict=True, **kwargs):
+    def setup_model(cls, model_name, no_cuda, num_classes=None, num_features=None, load_model=None, strict=True,
+                    **kwargs):
         """Setup the model, load and move to GPU if necessary
 
         Parameters
@@ -52,7 +55,8 @@ class GraphClassificationSetup(BaseSetup):
                 logging.error("No model dict found at '{}'".format(load_model))
                 raise SystemExit
             logging.info('Loading a saved model')
-            checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage.cuda(int(os.environ['CUDA_VISIBLE_DEVICES'])))
+            checkpoint = torch.load(load_model, map_location=lambda storage, loc: storage.cuda(
+                int(os.environ['CUDA_VISIBLE_DEVICES'])))
             if 'model_name' in checkpoint:
                 model_name = checkpoint['model_name']
             # Override the number of classes based on the size of the last layer in the dictionary
@@ -128,11 +132,10 @@ class GraphClassificationSetup(BaseSetup):
 
     ####################################################################################################################
     # Analytics handling
-
     @classmethod
     def create_analytics_csv(cls, input_folder, **kwargs):
         """
-        Create the analytics.csv file at the location specified by dataset_folder
+        Creates the analytics.csv file at the location specified by input_folder
 
         Format of the file:
             file name: analytics.csv
@@ -144,14 +147,22 @@ class GraphClassificationSetup(BaseSetup):
 
         Parameters
         ----------
-        input_folder : string
+        input_folder : str
             Path string that points to the dataset location
+        darwin_dataset : bool
+            Flag for using the darwin dataset class instead
+        train_ds : data.Dataset
+            Train split dataset
         """
-        # Sanity check on the folder
-        if not os.path.isdir(input_folder):
-            logging.error(f"Folder {input_folder} does not exist")
-            raise FileNotFoundError
+        # If it already exists your job is done
+        if (Path(input_folder) / "analytics.csv").is_file():
+            return
 
+        logging.warning(f'Missing analytics.csv file for dataset located at {input_folder}')
+        logging.warning(f'Attempt creating analytics.csv file')
+
+        # Measure mean and std on train images
+        logging.info(f'Calculating node / edge feature(s) mean and std')
         train_dataset = GxlDataset(input_folder, subset='train', **kwargs)
         mean_std_nodef, mean_std_edgef = compute_mean_std_graphs(dataset=train_dataset, **kwargs)
         class_weights = get_class_weights_graphs(dataset=train_dataset, **kwargs)
@@ -160,42 +171,80 @@ class GraphClassificationSetup(BaseSetup):
         edgef_names = train_dataset.config['edge_feature_names']
 
         # Save results as CSV file in the dataset folder
+        logging.info(f'Saving to analytics.csv')
         df = [nodef_names, mean_std_nodef['mean'], mean_std_nodef['std'],
-                           edgef_names, mean_std_edgef['mean'], mean_std_edgef['std'],
-                           class_weights]
+              edgef_names, mean_std_edgef['mean'], mean_std_edgef['std'],
+              train_dataset.config.classes, class_weights]
         df = pd.DataFrame([x if x is not None else [] for x in df])
 
         df.index = ['node features', 'mean[node feature]', 'std[node feature]',
                     'edge features', 'mean[edge feature]', 'std[edge feature]',
-                    'class_weights[num_classes]']
-
+                    'class labels', 'class_weights[num_classes]']
         df.to_csv(os.path.join(input_folder, 'analytics.csv'), header=False)
 
+        logging.warning(f'Created analytics.csv file for dataset located at {input_folder}')
+
+        return
+
     @classmethod
-    def load_class_weights_from_file(cls, **kwargs):
-        """ Recover class weights from the analytics.csv file
+    def load_class_weights_from_file(cls, input_folder, **kwargs):
+        """ Recover class weights from the analytics.csv file (weights are the inverse of frequency)
+
+        Parameters
+        ----------
+        input_folder : str
+            Path string that points to the three folder train/val/test. Example: ~/../../data/svhn
 
         Returns
         -------
         ndarray[double]
-            Class weights of the selected dataset, contained in the analytics.csv file.
+            Class weights for the selected dataset, contained in the analytics.csv file.
         """
-        # Loads the analytics csv and extract mean and std
-        csv_file = cls._load_analytics_csv(**kwargs)
-        weights = csv_file[csv_file[0] == 'class_weights[num_classes]'].values.tolist()[0][1:]
-        return np.array([x for x in weights if str(x) != 'nan'], dtype=float)
+        # Loads the analytics csv
+        if not (Path(input_folder) / "analytics.csv").exists():
+            raise SystemError(f"Analytics file not found in '{input_folder}'")
+        csv_file = pd.read_csv(Path(input_folder) / "analytics.csv", header=None)
+        # Extracts the weights
+        for row in csv_file.values:
+            if 'weights' in str(row[0]).lower():
+                weights = np.array([x for x in row[1:] if str(x) != 'nan'], dtype=float)
+        if 'weights' not in locals():
+            logging.error("Class weights not found in analytics.csv")
+            raise EOFError
+        return weights
+
+
+    # @classmethod
+    # def load_class_weights_from_file(cls, **kwargs):
+    #     """ Recover class weights from the analytics.csv file
+    #
+    #     Returns
+    #     -------
+    #     ndarray[double]
+    #         Class weights of the selected dataset, contained in the analytics.csv file.
+    #     """
+    #
+    #     # Loads the analytics csv and extract mean and std
+    #     csv_file = cls._load_analytics_csv(**kwargs)
+    #     weights = csv_file[csv_file[0] == 'class_weights[num_classes]'].values.tolist()[0][1:]
+    #     return np.array([x for x in weights if str(x) != 'nan'], dtype=float)
 
     @classmethod
-    def load_mean_std_from_file(cls, **kwargs):
+    def load_mean_std_from_file(cls, input_folder, **kwargs) -> dict:
         """ Recover mean and std from the analytics.csv file
+        input_folder : str
+            Path string that points to the three folder train/val/test. Example: ~/../../data/svhn
 
         Returns
         -------
-        ndarray[double], ndarray[double]
+        dict
             Mean and Std of the selected dataset, contained in the analytics.csv file.
         """
         # Loads the analytics csv and extract mean and std
-        csv_file = cls._load_analytics_csv(**kwargs)
+        if not (Path(input_folder) / "analytics.csv").exists():
+            raise SystemError(f"Analytics file not found in '{input_folder}'")
+        csv_file = pd.read_csv(Path(input_folder) / "analytics.csv", header=None)
+
         mean_std = {'node_features': {}, 'edge_features': {}}
         for row in csv_file.values:
             if 'node' in str(row[0]).lower():
@@ -203,19 +252,14 @@ class GraphClassificationSetup(BaseSetup):
             elif 'edge' in str(row[0]).lower():
                 flag = 'edge_features'
 
-            locals()
-            # if flag in locals():
             if 'mean' in str(row[0]).lower():
                 mean_std[flag]['mean'] = np.array([x for x in row[1:] if str(x) != 'nan'], dtype=float)
             if 'std' in str(row[0]).lower():
                 mean_std[flag]['std'] = np.array([x for x in row[1:] if str(x) != 'nan'], dtype=float)
 
-        for k, v in mean_std.items():
-            if len(v['mean']) != len(v['std']):
-                print("Number of {} does not match for mean and std in analytics.csv".format(k))
-                raise EOFError
-            if len(v['mean']) == 0 and len(v['std']) == 0:
-                print("No mean and std for {} in analytics.csv".format(k))
+        if sum([len(v) for v in mean_std.values()]) == 0:
+            logging.error("Mean or std not found in analytics.csv")
+            raise EOFError
 
         return mean_std
 
@@ -239,16 +283,17 @@ class GraphClassificationSetup(BaseSetup):
             kwargs['input_folder'])
         )
 
-        # Loads the analytics csv and extract mean and std
-        mean_std = cls.load_mean_std_from_file(**kwargs)
+        # Create the analytics csv
+        # TODO: set up normalization as transform?
+        cls.create_analytics_csv(**kwargs)
 
         # Load the datasets
-        train_ds, val_ds, test_ds = cls._get_datasets(mean_std=mean_std, **kwargs)
+        train_ds, val_ds, test_ds = cls._get_datasets(**kwargs)
 
         # Setup transforms
         # TODO implement this?
-#        logging.info('Setting up transforms')
-#        cls.set_up_transforms(train_ds=train_ds, val_ds=val_ds, test_ds=test_ds, **kwargs)
+        #        logging.info('Setting up transforms')
+        #        cls.set_up_transforms(train_ds=train_ds, val_ds=val_ds, test_ds=test_ds, **kwargs)
 
         # Get the dataloaders
         train_loader, val_loader, test_loader = cls._dataloaders_from_datasets(train_ds=train_ds,
@@ -280,6 +325,7 @@ class GraphClassificationSetup(BaseSetup):
         test_ds : data.Dataset
             Train, validation and test splits
         """
+        mean_sd = cls.load_mean_std_from_file(input_folder)
 
         if not os.path.isdir(input_folder):
             raise RuntimeError("Dataset folder not found at " + input_folder)
@@ -293,9 +339,9 @@ class GraphClassificationSetup(BaseSetup):
         else:
             logging.warning('Datasets will NOT be rebuilt!')
 
-        train_ds = cls.get_split(root_path=data_dir, subset='train', rebuild_dataset=rebuild_dataset, **kwargs)
-        val_ds = cls.get_split(root_path=data_dir, subset='val', rebuild_dataset=rebuild_dataset, **kwargs)
-        test_ds = cls.get_split(root_path=data_dir, subset='test', rebuild_dataset=rebuild_dataset, **kwargs)
+        train_ds = cls.get_split(root_path=data_dir, subset='train', rebuild_dataset=rebuild_dataset, mean_sd=mean_sd, **kwargs)
+        val_ds = cls.get_split(root_path=data_dir, subset='val', rebuild_dataset=rebuild_dataset, mean_sd=mean_sd, **kwargs)
+        test_ds = cls.get_split(root_path=data_dir, subset='test', rebuild_dataset=rebuild_dataset, mean_sd=mean_sd, **kwargs)
 
         return train_ds, val_ds, test_ds
 

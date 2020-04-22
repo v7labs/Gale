@@ -9,7 +9,7 @@ import logging
 
 
 class ParsedGxlDataset:
-    def __init__(self, path_to_dataset: str, categorical_features: dict = None, subset: str = None,
+    def __init__(self, path_to_dataset: str, categorical_features: dict, subset: str = None,
                  remove_coordinates: bool = False, features_to_use: list = None) -> object:
         """
         This class creates a dataset object containing all the graphs parsed from gxl files as ParsedGxlGraph objects
@@ -21,13 +21,13 @@ class ParsedGxlDataset:
         path_to_dataset: str
             path to the 'data' folder with gxl files
         categorical_features : dict
-            optional parameter: dictionary with first level 'edge' and/or 'node' and then a dict of dict(s) with the
-            name of the attribute and a dict of its respective one-hot encoding
-            e.g. {'node': {'symbol': {'C': [1, 0, 0], 'H': [0, 1, 0], 'O: [0, 0, 1]}}}
+            optional parameter: dictionary with first level 'edge' and/or 'node' and then a list of the attribute
+            names that should be one-hot encoded
+            e.g. {'node': ['charge']}}
         subset: if specified, has to be either 'train', 'test' or 'val'
         """
         self.path_to_dataset = path_to_dataset
-        self.name = os.path.basename(os.path.dirname(self.root_path))
+        self.name = os.path.basename(os.path.dirname(self.path_to_dataset))
 
         # optional arguments
         self.categorical_features = categorical_features
@@ -38,98 +38,23 @@ class ParsedGxlDataset:
         # get a list of the empty graphs
         self.invalid_files = []
 
+        # parse the graphs
+        self.graphs = self.get_graphs()
+
         # get the node and edge features names at a higher level plus their data type
         # sets: node_feature_names, edge_feature_names, node_dtypes, and edge_dtypes
         self.set_feature_names_and_types()
 
         # if there are string-based features, we need to encode them as a one-hot vector
-        if self.node_feature_names and (str in self.node_dtypes or len(self.categorical_features['node']) > 0):
+        if self.node_feature_names and len(self.categorical_features['node']) > 0:
             self.one_hot_encode_nodes()
-        if self.edge_feature_names and (str in self.edge_dtypes or len(self.categorical_features['edge']) > 0):
+        if self.edge_feature_names and len(self.categorical_features['edge']) > 0:
             self.one_hot_encode_edge_features()
 
-    def one_hot_encode_nodes(self):
-        """
-        TODO: continue here, simplify this
-        This functions one-hot encodes the categorical node feature values and changes them in all the graphs
-        (graph.node_features)
+        # get a list of all the filenames
+        self.file_names = [g.filename for g in self.graphs]
 
-        Returns
-        -------
-        encoded_node_features: list
-            one-hot encoding of the categorical node features
-            [(feature index (str), feature name (str), encoding (dict)), (...), ... ]
-        """
-        name_to_ind = {name: ind for ind, name in enumerate(self.node_feature_names)}
-
-        # get the name of the string features
-        cat_node_features = list(set(self.categorical_features['node'] + [self.node_feature_names[index] for index in
-                                                       [i for i, x in enumerate(self.node_dtypes) if x == str]]))
-        if self.features_to_use:
-            cat_node_features = [f for f in cat_node_features if f in self.features_to_use]
-
-        self.categorical_features['node'] = cat_node_features
-
-        encoded_node_features = []
-        # get the one-hot encodings
-        for feature_name in cat_node_features:
-            # find the feature range and generate the one-hot encoding
-            feature_ind = name_to_ind[feature_name]
-            all_feature_values = list(
-                set([edge[feature_ind] for graph in self.graphs for edge in graph.node_features]))
-            encoded_node_features += self._get_encoding(feature_name, all_feature_values, name_to_ind)
-
-        # overwrite the categorical node features with the argmax of the one-hot encoding
-        for graph_ind in range(self.__len__()):
-            for node_ind in range(self.graphs[graph_ind].nb_of_nodes):
-                for feature_ind, name, encoding in encoded_node_features:
-                    self.graphs[graph_ind].node_features[node_ind][feature_ind] = np.argmax(encoding[
-                        self.graphs[graph_ind].node_features[node_ind][feature_ind]])
-
-        self.nodes_onehot = encoded_node_features
-
-    def one_hot_encode_edge_features(self):
-        """
-        TODO: continue here, simplify this
-        This functions one-hot encodes the categorical edge feature values and changes them in all the
-        graphs (graph.edge_features)
-
-        Returns
-        -------
-        encoded_edge_features: list
-            one-hot encoding of the categorical edge features
-            [(feature index (str), feature name (str), encoding (dict)), (...), ... ]
-        """
-        name_to_ind = {name: ind for ind, name in enumerate(self.edge_feature_names)}
-
-        # get the name of the string features
-        cat_edge_features = list(set(self.categorical_features['edge'] + [self.edge_feature_names[index] for index in
-                                                       [i for i, x in enumerate(self.edge_dtypes) if x == str]]))
-        if self.features_to_use:
-            cat_edge_features = [f for f in cat_edge_features if f in self.features_to_use]
-        self.categorical_features['edge'] = cat_edge_features
-        self.config['categorical_features'] = self.categorical_features
-
-        # get the one-hot encodings
-        encoded_edge_features = []
-        for feature_name in cat_edge_features:
-            # find the feature range and generate the one-hot encoding
-            feature_ind = name_to_ind[feature_name]
-            all_feature_values = list(
-                set([edge[feature_ind] for graph in self.graphs for edge in graph.edge_features]))
-            encoded_edge_features += self._get_encoding(feature_name, all_feature_values, name_to_ind)
-
-        # overwrite the categorical edge features with the argmax of the one-hot encoding
-        for graph_ind in range(self.__len__()):
-            for edge_ind in range(self.graphs[graph_ind].nb_of_edges):
-                for feature_ind, name, encoding in encoded_edge_features:
-                    self.graphs[graph_ind].edge_features[edge_ind][feature_ind] = np.argmax(encoding[
-                        self.graphs[graph_ind].edge_features[edge_ind][feature_ind]])
-
-        self.nodes_onehot = encoded_edge_features
-
-    @property
-    def graphs(self) -> list:
+    def get_graphs(self) -> list:
         """
         Create the graph objects. If self.subset is set only the specified subset is loaded,
         otherwise the whole dataset is loaded.
@@ -174,11 +99,15 @@ class ParsedGxlDataset:
 
     @property
     def class_names(self) -> list:
-        return [c for c in sorted(set([i for i in self.filename_split_class.values()]))]
+        if self.subset:
+            class_labels = set([class_label for filename, class_label in self.dataset_split[self.subset].items()])
+        else:
+            class_labels = set([class_label for subset, d in self.dataset_split.items() for filename, class_label in d.items()])
+        return sorted(class_labels)
 
     @property
     def class_int_encoding(self) -> dict:
-        return {c: i for i, c in enumerate(self.class_names())}
+        return {c: i for i, c in enumerate(self.class_names)}
 
     @property
     def file_ids(self):
@@ -233,8 +162,8 @@ class ParsedGxlDataset:
         filename_class_split = {}
 
         for subset in ['train', 'test', 'val']:
-            cxl_file = os.path.join(self.root_path, subset + '.cxl')
-            if not os.path.isfile(os.path.join(self.root_path, subset + '.cxl')):
+            cxl_file = os.path.join(self.path_to_dataset, subset + '.cxl')
+            if not os.path.isfile(os.path.join(self.path_to_dataset, subset + '.cxl')):
                 logging.error(f'File {cxl_file} not found. Make sure file is called either train.cxl, val.cxl or test.cxl')
             tree = ET.parse(cxl_file)
             root = tree.getroot()
@@ -261,22 +190,73 @@ class ParsedGxlDataset:
 
         return config
 
+    def one_hot_encode_nodes(self):
+        """
+        This functions one-hot encodes the categorical node feature values and changes them in all the graphs
+        (graph.node_features)
+
+        sets self.nodes_onehot: one-hot encoding of the categorical node features {'feature name': {'feature value': encoding}
+        """
+        # get all the features
+        all_features = {feature: [set(g.get_node_feature_values(feature)) for g in self.graphs] for feature in self.categorical_features['node']}
+        for feature, all_f in all_features.items():
+            all_features[feature] = sorted(list(set.union(*all_f)))
+
+        # get the one-hot encodings
+        encoded_node_features = {feature: {f: i for i, f in enumerate(feature_list)}
+                                 for feature, feature_list in all_features.items()}
+
+        # update the graphs
+        for g in self.graphs:
+            g.one_hot_encode_node_features(encoded_node_features)
+
+        self.nodes_onehot = encoded_node_features
+
+    def one_hot_encode_edges(self):
+        """
+        This functions one-hot encodes the categorical edge feature values and changes them in all the graphs
+        (graph.edge_features)
+
+        sets self.edges_onehot: one-hot encoding of the categorical edge features {'feature name': {'feature value': encoding}
+        """
+        # get all the features
+        all_features = {feature: [set(g.get_node_feature_values(feature)) for g in self.graphs] for feature in
+                        self.categorical_features['node']}
+        for feature, all_f in all_features.items():
+            all_features[feature] = sorted(list(set.union(*all_f)))
+
+        # get the one-hot encodings
+        encoded_edge_features = {feature: {f: i for i, f in enumerate(feature_list)} for feature, feature_list in
+                                 all_features.items()}
+
+        # update the graphs
+        for g in self.graphs:
+            g.one_hot_encode_edge_features(encoded_edge_features)
+
+        self.edges_onehot = encoded_edge_features
+
     def set_feature_names_and_types(self):
         # get the node and edge feature names available at a higher level
         agraph = [g for g in self.graphs if len(g.node_features) > 0][0]
         self.node_feature_names = agraph.node_feature_names
         self.edge_feature_names = agraph.edge_feature_names
 
-        # node / edge feature data type
+        # set node / edge feature data type and update self.categorical_features
+        # if node type is a string, add them to self.categorical_features
+        # nodes
         if len(agraph.node_features) > 0:
             self.node_dtypes = [type(dtype) for dtype in agraph.node_features[0]]
             assert len(self.node_feature_names) == len(self.node_dtypes)
+            if str in self.node_dtypes:
+                self.categorical_features['node'] += [self.node_feature_names[i] for i, j in enumerate(self.node_dtypes) if j == str]
         else:
             self.node_dtypes = None
-
+        # edges
         if self.edge_feature_names:
             self.edge_dtypes = [type(dtype) for dtype in agraph.edge_features[0]]
             assert len(self.edge_feature_names) == len(self.edge_dtypes)
+            if str in self.edge_dtypes:
+                self.categorical_features['edge'] += [self.edge_feature_names[i] for i, j in enumerate(self.edge_dtypes) if j == str]
         else:
             self.edge_feature_names = None
 
@@ -333,8 +313,9 @@ class ParsedGxlGraph:
         self.remove_coordinates = remove_coordinates
         self.features_to_use = features_to_use  # TODO: implement
 
+        self.filename = os.path.basename(self.filepath)
         # name of the gxl file (without the ending)
-        self.file_id = os.path.basename(self.filepath).split('.')[0]
+        self.file_id = self.filename.split('.')[0]
 
         # parsing the gxl
         # sets up the following properties: node_features, node_feature_names, edges, edge_features, edge_feature_names,
@@ -363,6 +344,38 @@ class ParsedGxlGraph:
             logging.error(f"Subset has to be specified as either 'train', 'val' or 'test'")
             sys.exit(-1)
         self._subset = subset
+
+    @property
+    def nb_of_nodes(self):
+        return len(self.node_features)
+
+    @property
+    def nb_of_edges(self):
+        return len(self.edge_features)
+
+    def one_hot_encode_node_features(self, feature_encoding):
+        """
+        Update the nodes with the endocing for the categorical features
+        feature_encoding: list
+            contains the numerical encoding for each feature
+        """
+        for feature_name, encoding_dict in feature_encoding.items():
+            feature_ind = self.node_feature_names.index(feature_name)
+            # update the node features
+            for node_nr in range(len(self.node_features)):
+                self.node_features[node_nr][feature_ind] = encoding_dict[self.node_features[node_nr][feature_ind]]
+
+    def one_hot_encode_edge_features(self, feature_encoding):
+        """
+        Update the edges with the endocing for the categorical features
+        feature_encoding: list
+            contains the numerical encoding for each feature
+        """
+        for feature_name, encoding_dict in feature_encoding.items():
+            feature_ind = self.edge_feature_names.index(feature_name)
+            # update the edge features
+            for edge_nr in range(len(self.edge_features)):
+                self.edge_features[edge_nr][feature_ind] = encoding_dict[self.edge_features[edge_nr][feature_ind]]
 
     def setup_graph_features(self):
         """
@@ -398,6 +411,61 @@ class ParsedGxlGraph:
 
         self.edge_feature_names, self.edge_features = self.get_features(root, 'edge')  # ([str], list)
         self.graph_id, self.edge_ids_present, self.edgemode = self.get_graph_attr(root)  # (str, bool, str)
+
+    def get_node_feature_values(self, feature) -> list:
+        feature_ind = self.node_feature_names.index(feature)
+        all_features = [nf[feature_ind] for nf in self.node_features]
+        return all_features
+
+    def get_edge_feature_values(self, feature) -> list:
+        feature_ind = self.edge_features.index(feature)
+        all_features = [[nf][feature_ind] for nf in self.edge_features]
+        return all_features
+
+    def get_features(self, root, mode):
+        """
+        get a list of the node features out of the element tree (gxl)
+
+        Parameters
+        ----------
+        root: gxl element
+        mode: str
+            either 'edge' or 'node'
+
+        Returns
+        -------
+        tuple ([str], [mixed values]])
+            list of all node features for that tree
+            ([feature name 1, feature name 2, ...],  [[feature 1 of node 1, feature 2 of node 1, ...], [feature 1 of node 2, ...], ...])
+        """
+        features_info = [[feature for feature in graph_element] for graph_element in root.iter(mode)]
+        if len(features_info) > 0:
+            feature_names = [i.attrib['name'] for i in features_info[0]]
+        else:
+            feature_names = []
+
+        # TODO: only use the ones specified, if necessary
+        # if self.features_to_use is not None:
+        #     feature_names = [name for name in feature_names if name in self.features_to_use]
+
+        # check if we have features to generate
+        if len(feature_names) > 0:
+            features = [[self.decode_feature(value) for feature in graph_element for value in feature if feature.attrib['name'] in feature_names] for graph_element in root.iter(mode)]
+            # TODO: ensure that they are in the right order (should, but add a check anyways)
+            # for debugging
+            # features = []
+            # for node in root.iter(mode):
+            #     node_features = []
+            #     for feature in node:
+            #         if feature.attrib['name'] in feature_names:
+            #             for value in feature:
+            #                 node_features.append(self.decode_feature(value))
+            #     features.append(node_features)
+        else:
+            feature_names = None
+            features = []
+
+        return feature_names, features
 
     def sanity_check(self, root):
         """

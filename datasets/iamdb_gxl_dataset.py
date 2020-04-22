@@ -12,8 +12,8 @@ from datasets.util.gxl_parser import ParsedGxlDataset
 
 
 class GxlDataset(InMemoryDataset):
-    def __init__(self, root_path, transform=None, pre_transform=None, categorical_features=None, rebuild_dataset=True,
-                 subset='', remove_coordinates=False, features_to_use=None, no_empty_graphs=False, mean_std=None,
+    def __init__(self, root_path, transform=None, pre_transform=None, categorical_features_json=None, rebuild_dataset=True,
+                 subset='', remove_coordinates=False, features_to_use=None, mean_std=None,
                  disable_feature_norm=False, center_coordinates=False, **kwargs):
         """
         This class reads a IAM dataset in gxl format (tested for AIDS, Fingerprint, Letter)
@@ -48,11 +48,13 @@ class GxlDataset(InMemoryDataset):
         self.mean_std = mean_std
 
         self.features_to_use = features_to_use  # TODO: implement
+        self.categorical_features = categorical_features_json
         self.root = root_path
         self.subset = subset
         self.use_position = remove_coordinates
         self.disable_feature_norm = disable_feature_norm
         self.center_coordinates = center_coordinates
+
         # should we load the saved dataset from processed or should it be rebuilt
         processed_path = os.path.join(self.root, 'processed')
         if rebuild_dataset and os.path.exists(processed_path):
@@ -67,20 +69,33 @@ class GxlDataset(InMemoryDataset):
         self.data, self.slices, self.config = torch.load(self.processed_paths[0])
 
     @property
-    def categorical_features(self, json_path) -> dict:
-        if json_path is None:
+    def categorical_features(self):
+        return self._categorical_features
+
+    @categorical_features.setter
+    def categorical_features(self, categorical_features_json) -> dict:
+        """
+        dictionary with first level 'edge' and/or 'node' and then a list of the attribute names that should be one-hot
+        encoded, e.g. {'node': ['charge'], 'edge': ['valence]}.
+
+        Parameters
+        ----------
+        categorical_features_json: str
+            path to the json file
+        """
+        if categorical_features_json is None:
             categorical_features = {'node': [], 'edge': []}
         else:
             # read the json file
-            logging.info('Loading categorical variables from JSON ({})'.format(json_path))
+            logging.info('Loading categorical variables from JSON ({})'.format(categorical_features_json))
             with open('strings.json') as f:
-                categorical_features = json.load(json_path)
+                categorical_features = json.load(categorical_features_json)
             # add missing keys
             if 'edge' not in categorical_features:
                 categorical_features['edge'] = []
             if 'node' not in categorical_features:
                 categorical_features['node'] = []
-        return categorical_features
+        self._categorical_features = categorical_features
 
     @property
     def features_to_use(self) -> list:
@@ -131,14 +146,14 @@ class GxlDataset(InMemoryDataset):
         """
         Processes the dataset to the :obj:`self.processed_dir` folder.
         """
-        gxl_dataset = ParsedGxlDataset(os.path.join(self.root, 'data'), self.categorical_features, subset=self.subset,
-                                       remove_coordinates=self.use_position, features_to_use=self.features_to_use,
-                                       no_empty_graphs=self.no_empty_graphs)
+        gxl_dataset = ParsedGxlDataset(path_to_dataset=os.path.join(self.root, 'data'), categorical_features=self.categorical_features, subset=self.subset,
+                                       remove_coordinates=self.use_position, features_to_use=self.features_to_use)
 
         # make a csv with the number of nodes per graph
-        df = pd.DataFrame.from_records([[g.filename, int(g.nb_of_nodes), int(g.nb_of_edges)] for g in gxl_dataset.graphs],
-                                       columns=['filename', 'nb_of_nodes', 'nb_of_edges']).sort_values(by=['filename'])
-        df.to_csv(os.path.join(os.path.dirname(self.processed_paths[0]), 'nb_nodes_edges_per_graph.csv'), index=False)
+        if not os.path.isfile(os.path.join(os.path.dirname(self.processed_paths[0]), 'nb_nodes_edges_per_graph.csv')):
+            df = pd.DataFrame.from_records([[g.filename, int(g.nb_of_nodes), int(g.nb_of_edges)] for g in gxl_dataset.graphs],
+                                           columns=['filename', 'nb_of_nodes', 'nb_of_edges']).sort_values(by=['filename'])
+            df.to_csv(os.path.join(os.path.dirname(self.processed_paths[0]), 'nb_nodes_edges_per_graph.csv'), index=False)
 
         config = gxl_dataset.config
         data_list = []
@@ -160,7 +175,7 @@ class GxlDataset(InMemoryDataset):
                 graph.normalize(self.mean_std, self.center_coordinates)
             # node
             x = torch.tensor(graph.node_features, dtype=torch.float)
-            pos = torch.tensor(graph.node_position, dtype=torch.float)
+            pos = torch.tensor(graph.node_positions, dtype=torch.float)
             # edges
             edge_index = torch.tensor(graph.edges, dtype=torch.long).t().contiguous()
             edge_attr = torch.tensor(graph.edge_features, dtype=torch.float)
@@ -185,12 +200,13 @@ class GxlDataset(InMemoryDataset):
         if data.y is not None:
             index, counts = np.unique(np.array(data.y), return_counts=True)
             counts = counts / sum(counts)
-            config['class_freq'] = (index, counts)
+            config['class_freq'] = (list(index), list(counts))
             config['file_names'] = file_names
 
-        # TODO: fix this
-        # with open(os.path.join(os.path.dirname(self.processed_paths[0]), 'graphs_config.json'), 'w') as fp:
-        #     json.dump(config, fp)
+        # save the config TODO: fix this --> int64 in class_freq (maybe update json?)
+        if not os.path.isfile(os.path.join(os.path.dirname(self.processed_paths[0]), 'graphs_config.json')):
+            with open(os.path.join(os.path.dirname(self.processed_paths[0]), 'graphs_config.json'), 'w') as fp:
+                json.dump(config, fp)
 
         torch.save((data, slices, config), self.processed_paths[0])
 
