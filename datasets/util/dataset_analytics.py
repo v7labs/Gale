@@ -253,6 +253,6 @@ def get_class_weights_graphs(dataset, **kwargs):
 
     logging.info('Finished computing class frequencies weights ')
     logging.info(f'Class frequencies (rounded): {np.around(class_frequencies * 100, decimals=2)}')
-    logging.info(f'Class weights (rounded): {np.around(class_weights * 100, decimals=2)}')
+    logging.info(f'Class weights (rounded): {np.around(class_weights)}')
 
     return class_weights

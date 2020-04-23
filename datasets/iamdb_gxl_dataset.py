@@ -13,7 +13,7 @@ from datasets.util.gxl_parser import ParsedGxlDataset
 
 class GxlDataset(InMemoryDataset):
     def __init__(self, root_path, transform=None, pre_transform=None, categorical_features_json=None, rebuild_dataset=True,
-                 subset='', remove_coordinates=False, features_to_use=None, mean_std=None,
+                 subset='', ignore_coordinates=False, features_to_use=None, mean_std=None,
                  disable_feature_norm=False, center_coordinates=False, **kwargs):
         """
         This class reads a IAM dataset in gxl format (tested for AIDS, Fingerprint, Letter)
@@ -51,7 +51,7 @@ class GxlDataset(InMemoryDataset):
         self.categorical_features = categorical_features_json
         self.root = root_path
         self.subset = subset
-        self.use_position = remove_coordinates
+        self.use_position = ignore_coordinates
         self.disable_feature_norm = disable_feature_norm
         self.center_coordinates = center_coordinates
 
@@ -146,8 +146,10 @@ class GxlDataset(InMemoryDataset):
         """
         Processes the dataset to the :obj:`self.processed_dir` folder.
         """
-        gxl_dataset = ParsedGxlDataset(path_to_dataset=os.path.join(self.root, 'data'), categorical_features=self.categorical_features, subset=self.subset,
-                                       remove_coordinates=self.use_position, features_to_use=self.features_to_use)
+        gxl_dataset = ParsedGxlDataset(path_to_dataset=os.path.join(self.root, 'data'),
+                                       categorical_features=self.categorical_features, subset=self.subset,
+                                       ignore_coordinates=self.use_position, features_to_use=self.features_to_use,
+                                       center_coordinates=self.center_coordinates)
 
         # make a csv with the number of nodes per graph
         if not os.path.isfile(os.path.join(os.path.dirname(self.processed_paths[0]), 'nb_nodes_edges_per_graph.csv')):
@@ -172,7 +174,7 @@ class GxlDataset(InMemoryDataset):
             # y (Tensor): Graph or node targets with arbitrary shape
 
             if not self.disable_feature_norm and self.mean_std is not None:
-                graph.normalize(self.mean_std, self.center_coordinates)
+                graph.normalize(self.mean_std)
             # node
             x = torch.tensor(graph.node_features, dtype=torch.float)
             pos = torch.tensor(graph.node_positions, dtype=torch.float)
@@ -200,10 +202,11 @@ class GxlDataset(InMemoryDataset):
         if data.y is not None:
             index, counts = np.unique(np.array(data.y), return_counts=True)
             counts = counts / sum(counts)
-            config['class_freq'] = (list(index), list(counts))
+            # convert from numpy for json
+            config['class_freq'] = ([int(i) for i in index], [float(i) for i in counts])
             config['file_names'] = file_names
 
-        # save the config TODO: fix this --> int64 in class_freq (maybe update json?)
+        # save the config
         if not os.path.isfile(os.path.join(os.path.dirname(self.processed_paths[0]), 'graphs_config.json')):
             with open(os.path.join(os.path.dirname(self.processed_paths[0]), 'graphs_config.json'), 'w') as fp:
                 json.dump(config, fp)

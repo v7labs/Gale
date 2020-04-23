@@ -130,7 +130,6 @@ class ClassificationResults(Meter):
         return self.df.to_string(index=False, col_space=20).replace('\n', '\n\n')
 
 
-
 class ScalarValue(Meter):
     """
     Track a series of values and provide access to smoothed values
@@ -171,6 +170,7 @@ class ScalarValue(Meter):
     @property
     def value(self):
         return self.deque[-1]
+
 
 class ConfusionMatrix(Meter):
     def __init__(self, num_classes: int):

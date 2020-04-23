@@ -174,7 +174,7 @@ class GraphClassificationSetup(BaseSetup):
         logging.info(f'Saving to analytics.csv')
         df = [nodef_names, mean_std_nodef['mean'], mean_std_nodef['std'],
               edgef_names, mean_std_edgef['mean'], mean_std_edgef['std'],
-              train_dataset.config.classes, class_weights]
+              train_dataset.config['classes'], class_weights]
         df = pd.DataFrame([x if x is not None else [] for x in df])
 
         df.index = ['node features', 'mean[node feature]', 'std[node feature]',
@@ -212,22 +212,6 @@ class GraphClassificationSetup(BaseSetup):
             logging.error("Class weights not found in analytics.csv")
             raise EOFError
         return weights
-
-
-    # @classmethod
-    # def load_class_weights_from_file(cls, **kwargs):
-    #     """ Recover class weights from the analytics.csv file
-    #
-    #     Returns
-    #     -------
-    #     ndarray[double]
-    #         Class weights of the selected dataset, contained in the analytics.csv file.
-    #     """
-    #
-    #     # Loads the analytics csv and extract mean and std
-    #     csv_file = cls._load_analytics_csv(**kwargs)
-    #     weights = csv_file[csv_file[0] == 'class_weights[num_classes]'].values.tolist()[0][1:]
-    #     return np.array([x for x in weights if str(x) != 'nan'], dtype=float)
 
     @classmethod
     def load_mean_std_from_file(cls, input_folder, **kwargs) -> dict:
@@ -325,7 +309,7 @@ class GraphClassificationSetup(BaseSetup):
         test_ds : data.Dataset
             Train, validation and test splits
         """
-        mean_sd = cls.load_mean_std_from_file(input_folder)
+        mean_std = cls.load_mean_std_from_file(input_folder)
 
         if not os.path.isdir(input_folder):
             raise RuntimeError("Dataset folder not found at " + input_folder)
@@ -339,9 +323,9 @@ class GraphClassificationSetup(BaseSetup):
         else:
             logging.warning('Datasets will NOT be rebuilt!')
 
-        train_ds = cls.get_split(root_path=data_dir, subset='train', rebuild_dataset=rebuild_dataset, mean_sd=mean_sd, **kwargs)
-        val_ds = cls.get_split(root_path=data_dir, subset='val', rebuild_dataset=rebuild_dataset, mean_sd=mean_sd, **kwargs)
-        test_ds = cls.get_split(root_path=data_dir, subset='test', rebuild_dataset=rebuild_dataset, mean_sd=mean_sd, **kwargs)
+        train_ds = cls.get_split(root_path=data_dir, subset='train', rebuild_dataset=rebuild_dataset, mean_std=mean_std, **kwargs)
+        val_ds = cls.get_split(root_path=data_dir, subset='val', rebuild_dataset=rebuild_dataset, mean_std=mean_std, **kwargs)
+        test_ds = cls.get_split(root_path=data_dir, subset='test', rebuild_dataset=rebuild_dataset, mean_std=mean_std, **kwargs)
 
         return train_ds, val_ds, test_ds
 

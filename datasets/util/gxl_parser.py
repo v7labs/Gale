@@ -10,13 +10,13 @@ import logging
 
 class ParsedGxlDataset:
     def __init__(self, path_to_dataset: str, categorical_features: dict, subset: str = None,
-                 remove_coordinates: bool = False, features_to_use: list = None) -> object:
+                 ignore_coordinates: bool = False, features_to_use: list = None, center_coordinates: bool = False):
         """
         This class creates a dataset object containing all the graphs parsed from gxl files as ParsedGxlGraph objects
 
         Parameters
         ----------
-        remove_coordinates : bool
+        ignore_coordinates : bool
             if true, coordinates are removed from the node features
         path_to_dataset: str
             path to the 'data' folder with gxl files
@@ -32,8 +32,9 @@ class ParsedGxlDataset:
         # optional arguments
         self.categorical_features = categorical_features
         self.features_to_use = features_to_use  # TODO: implement
-        self.remove_coordinates = remove_coordinates
+        self.remove_coordinates = ignore_coordinates
         self.subset = subset
+        self.center_coordinates = center_coordinates
 
         # get a list of the empty graphs
         self.invalid_files = []
@@ -76,7 +77,8 @@ class ParsedGxlDataset:
                     continue
 
                 g = ParsedGxlGraph(os.path.join(self.path_to_dataset, filename), subset, self.class_int_encoding[class_label],
-                                   remove_coordinates=self.remove_coordinates, features_to_use=self.features_to_use)
+                                   remove_coordinates=self.remove_coordinates, features_to_use=self.features_to_use,
+                                   center_coordinates=self.center_coordinates)
                 graphs.append(g)
             except InvalidFileException:
                 logging.warning(f'File {filename} is invalid. Please verify that the file contains the expected attributes '
@@ -295,7 +297,7 @@ class ParsedGxlDataset:
 
 class ParsedGxlGraph:
     def __init__(self, path_to_gxl: str, subset: str, class_label: int, remove_coordinates: bool = False,
-                 features_to_use: dict = None) -> object:
+                 features_to_use: dict = None, center_coordinates: bool = False) -> object:
         """
         This class contains all the information encoded in a single gxl file = one graph
         Parameters
@@ -312,6 +314,7 @@ class ParsedGxlGraph:
         self.class_label = class_label
         self.remove_coordinates = remove_coordinates
         self.features_to_use = features_to_use  # TODO: implement
+        self.center_coordinates = center_coordinates
 
         self.filename = os.path.basename(self.filepath)
         # name of the gxl file (without the ending)
@@ -394,10 +397,20 @@ class ParsedGxlGraph:
         self.edges = self.get_edges(root)  # [[int, int]]
         self.node_feature_names, self.node_features = self.get_features(root, 'node')  # ([str], list)
 
-        # remove the x and y node features and put them in their own variable
+        # Add the coordinates to their own variable
         if self.node_feature_names is not None and 'x' in self.node_feature_names and 'y' in self.node_feature_names:
             x_ind = self.node_feature_names.index('x')
             y_ind = self.node_feature_names.index('y')
+
+            # center_coordinates
+            # if true, coordinates need to be centered (just in feature vector, xy-vector - xy(graph average)-vector)
+            if self.center_coordinates:
+                x_mean = np.mean([node[x_ind] for node in self.node_features])
+                y_mean = np.mean([node[y_ind] for node in self.node_features])
+                for node in self.node_features:
+                    node[x_ind] = node[x_ind] - x_mean
+                    node[y_ind] = node[y_ind] - y_mean
+
             self.node_positions = [[node[x_ind], node[y_ind]] for node in self.node_features]
             # remove the positions from the node features if we don't want to use them
             if self.remove_coordinates:
@@ -406,8 +419,10 @@ class ParsedGxlGraph:
                     del node[y_ind-1]
                 del self.node_feature_names[x_ind]
                 del self.node_feature_names[y_ind-1]
+
         else:
             self.node_positions = []  # [float / int]
+
 
         self.edge_feature_names, self.edge_features = self.get_features(root, 'edge')  # ([str], list)
         self.graph_id, self.edge_ids_present, self.edgemode = self.get_graph_attr(root)  # (str, bool, str)
@@ -465,6 +480,7 @@ class ParsedGxlGraph:
             feature_names = None
             features = []
 
+
         return feature_names, features
 
     def sanity_check(self, root):
@@ -489,10 +505,9 @@ class ParsedGxlGraph:
         elif len([edge for edge in root.iter('edge')]) == 0:
             logging.warning(f'File {self.filepath} has no edges!')
 
-    def normalize(self, mean_std, center_coordinates):
+    def normalize(self, mean_std):
         """
-        # TODO implement this
-        This method normalizes the node and edge features (if present) and initializes a random node for empty graphs
+        This method normalizes the node and edge features (if present)
 
         Parameters
         ----------
@@ -500,20 +515,15 @@ class ParsedGxlGraph:
 
         mean_std: dict
             dictionary containing the mean and standard deviation for the node and edge features
-        center_coordinates: set if coordinates need to be centered instead of normalized (xy-vector - xy(average)-vector)
 
         Returns
         ----------
         Normalized graph
 
         """
-        # TODO: make this work for when only selected features are used
+        # TODO: ensure this also works when only selected features are used
         def normalize(feature, mean, std, feature_name=None):
-            # TODO: if coordinates, center otherwise do z-normalization
-            if center_coordinates and feature_name in ['x', 'y', 'X', 'Y']:
-                return feature - mean
-            else:
-                return (feature - mean) / std
+            return (feature - mean) / std
 
         node_mean = mean_std['node_features']['mean']
         node_std = mean_std['node_features']['std']
