@@ -14,20 +14,15 @@ class GraphClassificationIamdbCLArguments(BaseCLArguments):
         # Add additional options
         super(GraphClassificationIamdbCLArguments, self).__init__()
 
-        self._graph_neural_network_options(self.parser)
+        self._graph_neural_network_options()
 
-    def _graph_neural_network_options(self, parser):
+    def _graph_neural_network_options(self):
         """ Options used to run graph neural networks"""
-        parser_graph_neural_network = parser.add_argument_group('GNN', 'Graph Neural Network Options')
+        parser_graph_neural_network = self.parser.add_argument_group('GNN', 'Graph Neural Network Options')
         parser_graph_neural_network.add_argument('--rebuild-dataset',
                                                  default=False,
                                                  action='store_true',
                                                  help='Set to False if you want to load the dataset from /processed')
-        # TODO
-        # parser_graph_neural_network.add_argument('--categorical-features-json',
-        #                                          default=None,
-        #                                          help='If true categorical feature values are loaded from file "categorical_features.json"'
-        #                                               ' in the input folder')
         parser_graph_neural_network.add_argument('--ignore-coordinates',
                                                  default=False,
                                                  action='store_true',
@@ -40,10 +35,6 @@ class GraphClassificationIamdbCLArguments(BaseCLArguments):
         parser_graph_neural_network.add_argument('--features-to-use',
                                                  type=str,
                                                  help='Specify features that should be used like "NodeFeatureName1,NodeFeatureName2,EdgefeatureName1"')
-        # parser_graph_neural_network.add_argument('--no-empty-graphs',
-        #                                          default=False,
-        #                                          action='store_true',
-        #                                          help='Does not allow empty graphs in the dataset (they are skipped)')
         parser_graph_neural_network.add_argument('--disable-feature-norm',
                                                  default=False,
                                                  action='store_true',

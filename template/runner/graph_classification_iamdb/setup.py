@@ -275,7 +275,7 @@ class GraphClassificationSetup(BaseSetup):
         train_ds, val_ds, test_ds = cls._get_datasets(**kwargs)
 
         # Setup transforms
-        # TODO implement this?
+        # TODO: find out how to implement transforms for torch_geometric library
         #        logging.info('Setting up transforms')
         #        cls.set_up_transforms(train_ds=train_ds, val_ds=val_ds, test_ds=test_ds, **kwargs)
 

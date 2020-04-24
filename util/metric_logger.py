@@ -125,7 +125,6 @@ class ClassificationResults(Meter):
             multi_run_label = '-run_' + multi_run_label
         df.to_csv(os.path.join(output_folder, 'classification-results{}.csv'.format(multi_run_label)), index=False)
 
-    # TODO add report function for TB
     def get_report(self):
         return self.df.to_string(index=False, col_space=20).replace('\n', '\n\n')
 

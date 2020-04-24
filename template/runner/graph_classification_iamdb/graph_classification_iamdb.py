@@ -69,17 +69,6 @@ class GraphClassificationIamdb(BaseRunner):
         epoch_lr_schedulers : list(torch.optim.lr_scheduler)
             List of lr schedulers to be called after each epoch. Can be empty
         """
-        # Get the selected model input size
-        # TODO see if necessary
-        # model_expected_input_size = models.__dict__[model_name].expected_input_size
-        # if type(model_expected_input_size) is not tuple or len(model_expected_input_size) != 2:
-        #     logging.error('Model {model_name} expected input size is not a tuple. '
-        #                   'Received: {model_expected_input_size}'
-        #                   .format(model_name=model_name,
-        #                           model_expected_input_size=model_expected_input_size))
-        #     sys.exit(-1)
-        # logging.info('Model {} expects input size of {}'.format(model_name, model_expected_input_size))
-
         # Setting up the dataloaders
         train_loader, val_loader, test_loader, num_classes, num_features = self.setup.set_up_dataloaders(**kwargs)
 

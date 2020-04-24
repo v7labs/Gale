@@ -10,7 +10,7 @@ import logging
 
 class ParsedGxlDataset:
     def __init__(self, path_to_dataset: str, categorical_features: dict, subset: str = None,
-                 ignore_coordinates: bool = False, features_to_use: list = None, center_coordinates: bool = False):
+                 ignore_coordinates: bool = False, center_coordinates: bool = False):
         """
         This class creates a dataset object containing all the graphs parsed from gxl files as ParsedGxlGraph objects
 
@@ -31,7 +31,6 @@ class ParsedGxlDataset:
 
         # optional arguments
         self.categorical_features = categorical_features
-        self.features_to_use = features_to_use  # TODO: implement
         self.remove_coordinates = ignore_coordinates
         self.subset = subset
         self.center_coordinates = center_coordinates
@@ -77,8 +76,7 @@ class ParsedGxlDataset:
                     continue
 
                 g = ParsedGxlGraph(os.path.join(self.path_to_dataset, filename), subset, self.class_int_encoding[class_label],
-                                   remove_coordinates=self.remove_coordinates, features_to_use=self.features_to_use,
-                                   center_coordinates=self.center_coordinates)
+                                   remove_coordinates=self.remove_coordinates, center_coordinates=self.center_coordinates)
                 graphs.append(g)
             except InvalidFileException:
                 logging.warning(f'File {filename} is invalid. Please verify that the file contains the expected attributes '
@@ -297,7 +295,7 @@ class ParsedGxlDataset:
 
 class ParsedGxlGraph:
     def __init__(self, path_to_gxl: str, subset: str, class_label: int, remove_coordinates: bool = False,
-                 features_to_use: dict = None, center_coordinates: bool = False) -> object:
+                 center_coordinates: bool = False) -> object:
         """
         This class contains all the information encoded in a single gxl file = one graph
         Parameters
@@ -313,7 +311,6 @@ class ParsedGxlGraph:
         self.subset = subset
         self.class_label = class_label
         self.remove_coordinates = remove_coordinates
-        self.features_to_use = features_to_use  # TODO: implement
         self.center_coordinates = center_coordinates
 
         self.filename = os.path.basename(self.filepath)
@@ -458,23 +455,9 @@ class ParsedGxlGraph:
         else:
             feature_names = []
 
-        # TODO: only use the ones specified, if necessary
-        # if self.features_to_use is not None:
-        #     feature_names = [name for name in feature_names if name in self.features_to_use]
-
         # check if we have features to generate
         if len(feature_names) > 0:
             features = [[self.decode_feature(value) for feature in graph_element for value in feature if feature.attrib['name'] in feature_names] for graph_element in root.iter(mode)]
-            # TODO: ensure that they are in the right order (should, but add a check anyways)
-            # for debugging
-            # features = []
-            # for node in root.iter(mode):
-            #     node_features = []
-            #     for feature in node:
-            #         if feature.attrib['name'] in feature_names:
-            #             for value in feature:
-            #                 node_features.append(self.decode_feature(value))
-            #     features.append(node_features)
         else:
             feature_names = None
             features = []
@@ -520,8 +503,7 @@ class ParsedGxlGraph:
         Normalized graph
 
         """
-        # TODO: ensure this also works when only selected features are used
-        def normalize(feature, mean, std, feature_name=None):
+        def normalize(feature, mean, std):
             return (feature - mean) / std
 
         node_mean = mean_std['node_features']['mean']

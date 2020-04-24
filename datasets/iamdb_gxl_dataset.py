@@ -13,7 +13,7 @@ from datasets.util.gxl_parser import ParsedGxlDataset
 
 class GxlDataset(InMemoryDataset):
     def __init__(self, root_path, transform=None, pre_transform=None, categorical_features_json=None, rebuild_dataset=True,
-                 subset='', ignore_coordinates=False, features_to_use=None, mean_std=None,
+                 subset='', ignore_coordinates=False, mean_std=None,
                  disable_feature_norm=False, center_coordinates=False, **kwargs):
         """
         This class reads a IAM dataset in gxl format (tested for AIDS, Fingerprint, Letter)
@@ -32,22 +32,18 @@ class GxlDataset(InMemoryDataset):
             that need to be one-hot encoded ( = are categorical)
             e.g. {'node': ['symbol'], 'edge': ['valence']}}
         rebuild_dataset: bool
-            True if dataset should be re-processed
+            True if dataset should be re-processed (deletes and re-generates the processes folder).
         subset: str
             'val', 'train' or 'test (or empty) --> name has to match the corresponding cxl file
-        features_to_use: string
-            comma delimited list of the attribute names (either node or edges) that should be used
-            e.g. "symbol,valence"
         mean_std: dict (optional)
-            default None. Dictionary containing the mean and std of the node and edge features. If not none, the normalzation
-            will be performed.
+            default None. Dictionary containing the mean and std of the node and edge features. If not set, the features
+            are z-normalized.
 
         """
         self.transform = None
         self.target_transform = None
         self.mean_std = mean_std
 
-        self.features_to_use = features_to_use  # TODO: implement
         self.categorical_features = categorical_features_json
         self.root = root_path
         self.subset = subset
@@ -73,7 +69,7 @@ class GxlDataset(InMemoryDataset):
         return self._categorical_features
 
     @categorical_features.setter
-    def categorical_features(self, categorical_features_json) -> dict:
+    def categorical_features(self, categorical_features_json):
         """
         dictionary with first level 'edge' and/or 'node' and then a list of the attribute names that should be one-hot
         encoded, e.g. {'node': ['charge'], 'edge': ['valence]}.
@@ -96,17 +92,6 @@ class GxlDataset(InMemoryDataset):
             if 'node' not in categorical_features:
                 categorical_features['node'] = []
         self._categorical_features = categorical_features
-
-    @property
-    def features_to_use(self) -> list:
-        return self._features_to_use
-
-    @features_to_use.setter
-    def features_to_use(self, features_to_use):
-        if features_to_use is not None:
-            assert type(features_to_use) == str
-            features_to_use = [item for item in features_to_use.split(',')]
-        self._features_to_use = features_to_use
 
     @property
     def root(self):
@@ -148,8 +133,7 @@ class GxlDataset(InMemoryDataset):
         """
         gxl_dataset = ParsedGxlDataset(path_to_dataset=os.path.join(self.root, 'data'),
                                        categorical_features=self.categorical_features, subset=self.subset,
-                                       ignore_coordinates=self.use_position, features_to_use=self.features_to_use,
-                                       center_coordinates=self.center_coordinates)
+                                       ignore_coordinates=self.use_position, center_coordinates=self.center_coordinates)
 
         # make a csv with the number of nodes per graph
         if not os.path.isfile(os.path.join(os.path.dirname(self.processed_paths[0]), 'nb_nodes_edges_per_graph.csv')):
