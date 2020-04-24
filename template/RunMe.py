@@ -547,9 +547,12 @@ class RunMe:
             f.write(json.dumps(args_dict))
 
         # Save all environment packages to logs_folder
-        environment_yml = os.path.join(log_folder, 'environment.yml')
-        current_environment = os.environ['CONDA_DEFAULT_ENV']
-        subprocess.call(f'conda env export -n {current_environment} -f {environment_yml} --no-builds', shell=True)
+        if 'CONDA_DEFAULT_ENV' in os.environ:
+            environment_yml = os.path.join(log_folder, 'environment.yml')
+            current_environment = os.environ['CONDA_DEFAULT_ENV']
+            subprocess.call(f'conda env export -n {current_environment} -f {environment_yml} --no-builds', shell=True)
+        else:
+            logging.info('Could not export environment file (probably you run it with an IDE).')
 
         # Define Tensorboard SummaryWriter
         logging.info('Initialize Tensorboard SummaryWriter')
