@@ -423,7 +423,6 @@ class ParsedGxlGraph:
         else:
             self.node_positions = []  # [float / int]
 
-
         self.edge_feature_names, self.edge_features = self.get_features(root, 'edge')  # ([str], list)
         self.graph_id, self.edge_ids_present, self.edgemode = self.get_graph_attr(root)  # (str, bool, str)
 
@@ -500,16 +499,16 @@ class ParsedGxlGraph:
             raise InvalidFileException
 
         if len([node for node in root.iter('node')]) == 0:
-            logging.warning(f'File {self.filepath} is an empty graph!')
+            logging.warning(f'File {os.path.basename(self.filepath)} is an empty graph!')
             raise InvalidFileException
         elif len([edge for edge in root.iter('edge')]) == 0:
-            logging.warning(f'File {self.filepath} has no edges!')
+            logging.warning(f'File {os.path.basename(self.filepath)} has no edges!')
 
     def normalize(self, mean_std):
         """
         This method normalizes the node and edge features (if present)
 
-        Parameters
+        Parameters§
         ----------
         graph: ParsedGxlGraph
 
