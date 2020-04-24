@@ -22,6 +22,7 @@ import tarfile
 import tempfile
 import time
 import traceback
+from pathlib import Path
 
 import colorlog
 import numpy as np
@@ -316,12 +317,12 @@ class RunMe:
         # As many times as runs
         for i in range(multi_run):
             logging.info('Multi-Run: {} of {}'.format(i + 1, multi_run))
-            performance = runner_class().single_run(run=i,
+            return_value = runner_class().single_run(run=i,
                                                     current_log_folder=current_log_folder,
                                                     multi_run=multi_run,
                                                     epochs=epochs,
                                                     **kwargs)
-            train_scores[i, :], val_scores[i, :], test_scores[i] = (performance['train'], performance['val'], performance['test'])
+            train_scores[i, :], val_scores[i, :], test_scores[i] = (return_value['train'], return_value['val'], return_value['test'])
 
 
             # Generate and add to tensorboard the shaded plot for train
@@ -347,7 +348,7 @@ class RunMe:
         np.save(os.path.join(current_log_folder, 'train_values.npy'), train_scores)
         np.save(os.path.join(current_log_folder, 'val_values.npy'), val_scores)
         logging.info('Multi-run values for test-mean:{} test-std: {}'.format(np.mean(test_scores), np.std(test_scores)))
-        s = 'mean: {}\n\nstd: {}'.format(np.mean(test_scores), np.std(test_scores))
+        s = f'mean: {np.mean(test_scores)}\n\nstd: {np.std(test_scores)}'
         TBWriter().add_text(tag='Performance average and std over {} runs\n'.format(multi_run),
                             text_string=s)
 
@@ -547,8 +548,15 @@ class RunMe:
             f.write(json.dumps(args_dict))
 
         # Save all environment packages to logs_folder
-        environment_yml = os.path.join(log_folder, 'environment.yml')
-        subprocess.call('conda env export > {}'.format(environment_yml), shell=True)
+        if 'CONDA_DEFAULT_ENV' in os.environ:
+            environment_yml = os.path.join(log_folder, 'environment.yml')\
+                .replace('[', '\[')\
+                .replace(']', '\]')\
+                .replace("'", "\\'")
+            current_environment = os.environ['CONDA_DEFAULT_ENV']
+            subprocess.call(f'conda env export -n {current_environment} -f {environment_yml} --no-builds', shell=True)
+        else:
+            logging.info('Could not export environment file (probably you run it with an IDE).')
 
         # Define Tensorboard SummaryWriter
         logging.info('Initialize Tensorboard SummaryWriter')
@@ -574,11 +582,11 @@ class RunMe:
             None
         """
         # All file extensions to be saved by copy-code.
-        FILE_TYPES = ['.sh', '.py']
+        FILE_TYPES = ['.sh', '.py', '.yml', '.json', '.md', '.ipynb']
 
-        # Get DeepDIVA root
+        # Get Gale root
         cwd = os.getcwd()
-        dd_root = os.path.join(cwd.split('DeepDIVA')[0], 'DeepDIVA')
+        dd_root = os.path.join(cwd.split('gale')[0], 'gale')
 
         files = get_all_files_in_folders_and_subfolders(dd_root)
 
@@ -588,14 +596,14 @@ class RunMe:
         tmp_dir = tempfile.mkdtemp()
 
         for item in code_files:
-            dest = os.path.join(tmp_dir, 'DeepDIVA', item.split('DeepDIVA')[1][1:])
+            dest = os.path.join(tmp_dir, 'gale', item.split('gale')[1][1:])
             if not os.path.exists(os.path.dirname(dest)):
                 os.makedirs(os.path.dirname(dest))
             shutil.copy(item, dest)
 
         # TODO: make it save a zipfile instead of a tarfile.
-        with tarfile.open(os.path.join(output_folder, 'DeepV7.tar.gz'), 'w:gz') as tar:
-            tar.add(tmp_dir, arcname='DeepDIVA')
+        with tarfile.open(os.path.join(output_folder, 'gale.tar.gz'), 'w:gz') as tar:
+            tar.add(tmp_dir, arcname='gale')
 
         # Clean up all temporary files
         shutil.rmtree(tmp_dir)

@@ -265,7 +265,7 @@ class BaseRunner(AbstractRunner):
         model = self.setup.setup_model(**kwargs)
 
         # Test
-        test_value = self._test(model=model, criterion=criterion, epoch=epochs - 1, **kwargs)
+        test_value = self._test(model=model, criterion=criterion, epoch=epochs - 1, current_log_folder=current_log_folder, **kwargs)
         logging.info(f'Test: {test_value}')
         logging.info('Training completed')
         return test_value

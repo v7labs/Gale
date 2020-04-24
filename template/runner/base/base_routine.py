@@ -16,6 +16,8 @@ class BaseRoutine:
         """
         Training routine
 
+        multi_run_label is set here to either the number of the run or empty if just a single run
+
         Parameters
         ----------
         data_loader : torch.utils.data.DataLoader
@@ -84,13 +86,12 @@ class BaseRoutine:
 
             # Log to console
             if batch_idx % log_interval == 0 and len(MetricLogger()) > 0:
-                if batch_idx % log_interval == 0 and len(MetricLogger()) > 0:
-                    if cls.main_metric() + multi_run_label in MetricLogger():
-                        mlogger = MetricLogger()[cls.main_metric()]
-                    elif "loss" + multi_run_label in MetricLogger():
-                        mlogger = MetricLogger()["loss"]
-                    else:
-                        raise AttributeError
+                if cls.main_metric() + multi_run_label in MetricLogger():
+                    mlogger = MetricLogger()[cls.main_metric()]
+                elif "loss" + multi_run_label in MetricLogger():
+                    mlogger = MetricLogger()["loss"]
+                else:
+                    raise AttributeError
                 pbar.set_description(f'{logging_label} epoch [{epoch}][{batch_idx}/{len(data_loader)}]')
                 pbar.set_postfix(Metric=f'{mlogger.global_avg:.3f}',
                                  Time=f'{batch_time:.3f}',
