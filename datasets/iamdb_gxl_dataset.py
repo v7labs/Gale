@@ -150,6 +150,9 @@ class GxlDataset(InMemoryDataset):
         if not os.path.isfile(os.path.join(os.path.dirname(self.processed_paths[0]), 'file_name_list.csv')):
             pd.DataFrame({'file_names': file_names}).to_csv(os.path.join(os.path.dirname(self.processed_paths[0]), 'file_name_list.csv'), index=False)
 
+        if not self.disable_feature_norm and self.mean_std is not None:
+            logging.info('Graph features are normalized.')
+
         for graph in gxl_dataset.graphs:
             # x (Tensor): Node feature matrix with shape :obj:`[num_nodes, num_node_features]`
             # y (Tensor): Graph or node targets with arbitrary shape.

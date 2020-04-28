@@ -516,7 +516,7 @@ class ParsedGxlGraph:
             # normalize the node features
             for node_ind in range(len(self.node_features)):
                 self.node_features[node_ind] = [
-                    normalize(self.node_features[node_ind][i], node_mean[i], node_std[i], self.node_feature_names[i])
+                    normalize(self.node_features[node_ind][i], node_mean[i], node_std[i])
                     for i in range(len(node_mean))]
             # normalize the edge features (except the coordinates
             for edge_ind in range(len(self.edge_features)):
