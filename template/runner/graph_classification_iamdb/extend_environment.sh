@@ -11,9 +11,9 @@ then
 fi
 
 # make sure pytorch version is valid
-if ! [[ "cu92cu100cu101" =~ ${CUDA_V} ]]
+if ! [[ "1.4.01.5.0" =~ ${PYTORCH_VERSION} ]]
 then
-   echo "Current PyTorch version ${PYTORCH_VERSION} is not valid. PyTorch version 1.4 or 1.5 is needed."
+   echo "Current PyTorch version ${PYTORCH_VERSION} is not valid. PyTorch version 1.4.0 or 1.5.0 is needed."
 fi
 
 echo "Installing the additonal environment requirements for the graph classification runner"
