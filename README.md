@@ -38,6 +38,9 @@ bash setup_environment.sh
 
 Reload your environment variables from `.bashrc` with: `source ~/.bashrc`
 
+Some runners require additional packages. To install them, simply run the `extend_environment.sh` script in the folder
+of the respective runner.
+
 ## Verifying Everything Works
 
 To verify the correctness of the procecdure you can run a small experiment. Activate the DeepDIVA python environment:
