@@ -1,5 +1,5 @@
 from torch_geometric.nn import TopKPooling, GraphConv
-from torch_geometric.nn import global_mean_pool, global_max_pool
+from torch_geometric.nn import global_mean_pool
 
 import torch
 from torch.nn import Linear, functional as F
@@ -77,7 +77,6 @@ class GraphConv1TPK(torch.nn.Module):
         x, edge_index, _, batch, _, _ = self.pool(x, edge_index, None, batch)
         x = F.relu(self.conv3(x, edge_index))
         x = global_mean_pool(x, batch, size=target_size)
-        # x = [global_max_pool(x, batch), global_mean_pool(x, batch)], dim=1)
 
         x = F.relu(self.lin1(x))
         x = F.log_softmax(self.lin2(x), dim=-1)
