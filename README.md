@@ -3,7 +3,7 @@
 This framework is an evolved fork of [DeepDIVA: A Highly-Functional Python Framework for Reproducible Experiments](https://diva-dia.github.io/DeepDIVAweb/index.html).
 The major differences are the full adoption of an object oriented programming design, the polishing of the workflow, the introduction of an optimized inference-use case and a better isolation between the tasks.
 
-This work has been conducted during an intership at V7 Labs, London, UK.
+This work has been conducted during an internship at V7, London, UK.
 
 ## Additional resources
 
@@ -29,4 +29,3 @@ If you use our software, please cite our paper as:
 ## License
 
 Our work is on GNU Lesser General Public License v3.0
-
