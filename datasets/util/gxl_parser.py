@@ -315,7 +315,7 @@ class ParsedGxlGraph:
 
         self.filename = os.path.basename(self.filepath)
         # name of the gxl file (without the ending)
-        self.file_id = self.filename.split('.')[0]
+        self.file_id = self.filename[:-4]
 
         # parsing the gxl
         # sets up the following properties: node_features, node_feature_names, edges, edge_features, edge_feature_names,
