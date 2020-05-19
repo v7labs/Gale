@@ -647,7 +647,7 @@ class BaseSetup:
         # If enabled, save all checkpoints with epoch number.
         if checkpoint_all_epochs:
             shutil.move(filename, os.path.join(log_dir, f'checkpoint_{epoch}.pth.tar'))
-        if checkpoint_every is not None:
+        elif checkpoint_every is not None:
             if (epoch+1) % checkpoint_every == 0:
                 shutil.copyfile(filename, os.path.join(log_dir, f'checkpoint_{epoch}.pth.tar'))
         return best_value
