@@ -605,7 +605,8 @@ class BaseSetup:
     ################################################################################################
     # Checkpointing handling
     @classmethod
-    def checkpoint(cls, epoch, new_value, best_value, log_dir, the_lower_the_better=None, checkpoint_all_epochs=False, **kwargs):
+    def checkpoint(cls, epoch, new_value, best_value, log_dir, the_lower_the_better=None,
+                   checkpoint_all_epochs=False, checkpoint_every=None, **kwargs):
         """Saves the current training checkpoint and the best valued checkpoint to file.
 
         Parameters
@@ -625,6 +626,8 @@ class BaseSetup:
             (useful when metric evaluted is error rate)
         checkpoint_all_epochs : bool
             If enabled, save checkpoint after every epoch.
+        checkpoint_every : int
+            If specified, save checkpoint after every N epochs.
         kwargs : dict
             Any additional arguments.
         Returns
@@ -644,6 +647,9 @@ class BaseSetup:
         # If enabled, save all checkpoints with epoch number.
         if checkpoint_all_epochs:
             shutil.move(filename, os.path.join(log_dir, f'checkpoint_{epoch}.pth.tar'))
+        if checkpoint_every is not None:
+            if (epoch+1) % checkpoint_every == 0:
+                shutil.copyfile(filename, os.path.join(log_dir, f'checkpoint_{epoch}.pth.tar'))
         return best_value
 
     @classmethod

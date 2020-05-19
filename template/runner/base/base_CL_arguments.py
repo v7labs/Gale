@@ -236,6 +236,10 @@ class BaseCLArguments:
                                   action='store_true',
                                   default=False,
                                   help='make a checkpoint after every epoch')
+        parser_train.add_argument('--checkpoint-every',
+                                  type=int,
+                                  default=None,
+                                  help='if specified, make a checkpoint after every N epochs')
 
     def _optimizer_options(self):
         """ Options specific for optimizers """
