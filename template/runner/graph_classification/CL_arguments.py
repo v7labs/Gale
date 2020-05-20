@@ -9,10 +9,10 @@ import models
 from template.runner.base.base_CL_arguments import BaseCLArguments
 
 
-class GraphClassificationIamdbCLArguments(BaseCLArguments):
+class CLArguments(BaseCLArguments):
     def __init__(self):
         # Add additional options
-        super(GraphClassificationIamdbCLArguments, self).__init__()
+        super(CLArguments, self).__init__()
 
         self._graph_neural_network_options()
 

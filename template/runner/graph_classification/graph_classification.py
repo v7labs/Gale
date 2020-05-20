@@ -10,7 +10,7 @@ from .train import GraphClassificationTrain
 from .evaluate import GraphClassificationEvaluate
 
 
-class GraphClassificationIamdb(BaseRunner):
+class GraphClassification(BaseRunner):
 
     def __init__(self):
         """
