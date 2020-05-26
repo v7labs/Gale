@@ -248,6 +248,7 @@ class BaseSetup:
 
     ################################################################################################
     # Analytics handling
+
     @classmethod
     def create_analytics_csv(cls, input_folder, darwin_dataset, train_ds, **kwargs):
         """

@@ -17,7 +17,7 @@ class ImageClassification(BaseRunner):
             (strategy design pattern) Object responsible for setup operations
         """
         super().__init__()
-        self.setup =  ImageClassificationSetup()
+        self.setup = ImageClassificationSetup()
 
     ####################################################################################################################
     """

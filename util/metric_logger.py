@@ -3,6 +3,7 @@ import logging
 import traceback
 from abc import abstractmethod
 from collections import deque
+import os
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -46,6 +47,9 @@ class MetricLogger(metaclass=Singleton):
     def add_confusion_matrix_meter(self, tag: str, num_classes: int):
         self.add_meter(tag, ConfusionMatrix(num_classes))
 
+    def add_classification_results_meter(self, tag: str, file_list: list):
+        self.add_meter(tag, ClassificationResults(file_list))
+
     def add_meter(self, tag, meter):
         assert isinstance(meter, Meter)
         self._meters[tag + self._postfix] = meter
@@ -83,6 +87,46 @@ class Meter(object):
     @abstractmethod
     def update(self, **kwargs):
         raise NotImplementedError
+
+
+class ClassificationResults(Meter):
+    def __init__(self, file_list):
+        self.file_list = file_list
+        self.mat = np.empty((0, 3), dtype=int)
+
+    def update(self, p, t, f_ind):
+        """
+        Update the confusion matrix with the new entries
+
+        Parameters
+        ----------
+        p : ndarray[int]
+        t : ndarray[int]
+            Prediction and target arrays of integers
+        f_ind: index of filename in file name list
+        """
+        # Better safe than sorry ;)
+        assert isinstance(p, np.ndarray)
+        assert isinstance(t, np.ndarray)
+        assert p.size == t.size
+
+        self.mat = np.row_stack((self.mat, np.column_stack((f_ind, t, p))))
+
+    @property
+    def df(self):
+        df = pd.DataFrame(self.mat)
+        df.columns = ['file_name', 'true_label', 'predicted_label']
+        df['file_name'] = df['file_name'].map({i: self.file_list[i] for i in df['file_name']})
+        return df
+
+    def save_csv(self, output_folder, multi_run_label):
+        df = self.df
+        if len(multi_run_label) > 0:
+            multi_run_label = '-run_' + multi_run_label
+        df.to_csv(os.path.join(output_folder, 'classification-results{}.csv'.format(multi_run_label)), index=False)
+
+    def get_report(self):
+        return self.df.to_string(index=False, col_space=20).replace('\n', '\n\n')
 
 
 class ScalarValue(Meter):
@@ -128,7 +172,6 @@ class ScalarValue(Meter):
 
 
 class ConfusionMatrix(Meter):
-
     def __init__(self, num_classes: int):
         self.num_classes = num_classes
         self.mat = np.zeros((num_classes, num_classes), dtype=int)
@@ -233,12 +276,6 @@ class ConfusionMatrix(Meter):
             f"{'{:>20}'.format('accuracy')}:\t"   + f"{acc * 100:.1f}\n\n       "
         )
         return s
-
-
-
-
-
-
 
 
 

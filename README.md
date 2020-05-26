@@ -29,3 +29,22 @@ If you use our software, please cite our paper as:
 ## License
 
 Our work is on GNU Lesser General Public License v3.0
+
+## Getting started
+
+In order to get the framework up and running it is only necessary to clone the latest version of the repository:
+
+``` shell
+git clone https://github.com/v7labs/Gale.git
+```
+
+Run the script:
+
+``` shell
+bash setup_environment.sh
+```
+
+Reload your environment variables from `.bashrc` with: `source ~/.bashrc`
+
+Some runners require additional packages. To install them, simply run the `extend_environment.sh` script in the folder
+of the respective runner.
